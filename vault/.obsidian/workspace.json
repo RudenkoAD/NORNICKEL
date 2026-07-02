@@ -4,17 +4,17 @@
     "type": "split",
     "children": [
       {
-        "id": "f33085bd29fd120a",
+        "id": "ce0c316de019e960",
         "type": "tabs",
         "children": [
           {
-            "id": "9117186e362d17e2",
+            "id": "b19b836fe9375b79",
             "type": "leaf",
             "state": {
-              "type": "empty",
+              "type": "graph",
               "state": {},
-              "icon": "lucide-file",
-              "title": "Новая вкладка"
+              "icon": "lucide-git-fork",
+              "title": "Граф"
             }
           }
         ]
@@ -187,6 +187,12 @@
       "obsidian-agent:Agent Chat": false
     }
   },
-  "active": "2f2d43cd19e7bc61",
-  "lastOpenFiles": []
+  "active": "b19b836fe9375b79",
+  "lastOpenFiles": [
+    "corpus/ni_al_heat_treatment.md",
+    "Без названия.base",
+    "corpus/flotation_reagent_study.md",
+    "corpus/ti_corrosion_test.md",
+    "corpus"
+  ]
 }
