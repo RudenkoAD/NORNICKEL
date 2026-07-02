@@ -1,1 +1,7 @@
 /.claude
+
+# Obsidian vault config (changes constantly)
+vault/.obsidian/
+
+# Node
+obsidian_agent/node_modules/
