@@ -1,0 +1,19 @@
+{
+  "name": "obsidian-agent",
+  "version": "0.1.0",
+  "description": "Chat UI for AI agent with clickable document links — Knowledge Graph track",
+  "main": "main.js",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "esbuild": "^0.25.0",
+    "obsidian": "^1.8.0",
+    "typescript": "^5.7.0"
+  }
+}

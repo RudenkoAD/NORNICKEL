@@ -1,0 +1,9 @@
+{
+  "id": "obsidian-agent",
+  "name": "Obsidian Agent",
+  "version": "0.1.0",
+  "minAppVersion": "1.7.0",
+  "description": "Chat AI agent with clickable document links — Knowledge Graph track",
+  "author": "NORTHERN TEAM",
+  "isDesktopOnly": false
+}
