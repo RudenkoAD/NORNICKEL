@@ -3,7 +3,7 @@
 > Кейс хакатона Норникеля. Дедлайн сдачи: **4 июля 23:59** (код в VCS + видео-демо ≤5 мин + презентация + желательно развёрнутое решение для жюри).
 >
 > Этот документ — единственный источник правды для всех, кто пишет код (людей и агентов).
-> Версия 2.3: v2 переработана по итогам ревью v1 (34 дефекта, §14), выверена тремя независимыми критиками (46 правок); решения от 03.07: fail fast без локальных фоллбеков (инвариант №9), фоллбек-контур единиц измерения (§4.3), Poetry вместо pip, веб-фронтенд + хостинг на Yandex Cloud (§8, §11).
+> Версия 2.4: v2 переработана по итогам ревью v1 (34 дефекта, §14), выверена тремя независимыми критиками (46 правок); решения от 03.07: fail fast без локальных фоллбеков (инвариант №9), фоллбек-контур единиц измерения (§4.3), Poetry вместо pip, веб-фронтенд на **Streamlit** (минимум зависимостей) + хостинг на Yandex Cloud (§8, §11).
 
 ---
 
@@ -51,8 +51,8 @@
 | Модели | Извлечение (Index): сильная модель каталога (qwen3-235b или yandexgpt/rc — по смок-тесту §12-P0). Синтез (Active): быстрая модель. Tools вызывать в **non-streaming** режиме (известный баг vLLM/qwen с потерей аргументов tool-calls в стриминге) | |
 | Эмбеддинги | **Yandex AI Studio embeddings** (`text-search-doc` / `text-search-query`, 256d). Локального фоллбека НЕТ — при ошибке API явная ошибка (инвариант №9). Кросс-языковость (ru-чанк ↔ en-запрос) проверяется смок-тестом §12-P0; страховка — двуязычный `query_text` из планировщика (§5.1) | Ноль хостинга модели. Размерность — `EMB_DIM=256`, в коде `assert len(vec) == EMB_DIM` |
 | Бэкенд | Python 3.11 + FastAPI, **uvicorn workers=1** (инвариант №8); зависимости — **Poetry** (`pyproject.toml` + `poetry.lock` коммитятся в git) | Детерминированные версии; в Dockerfile `poetry install --only main` |
-| Фронтенд | **React 18 + Vite + TypeScript + Tailwind** (SPA, §8): граф — `react-force-graph-2d`, SSE — `@microsoft/fetch-event-source`, рендер ответов — `react-markdown` | Жюри трогает систему по публичному URL без установки чего-либо; те же экраны идут в видео |
-| Хостинг | **Yandex Cloud, одна VM**: docker-compose из трёх сервисов (neo4j + backend + frontend/nginx); nginx отдаёт SPA и проксирует `/api` → backend (§11) | Same-origin — без CORS; один деплой-юнит; тот же compose поднимается локально |
+| Фронтенд | **Streamlit** (Python, §8): чат — `st.chat_input` + `st.write_stream`, прогресс шагов — `st.status`, граф — `streamlit-agraph` (fallback `pyvis`) | Минимум зависимостей: +2 строки в pyproject, без node/npm/vite. Streamlit — тонкий клиент над REST API; жюри трогает систему по публичному URL; те же экраны идут в видео |
+| Хостинг | **Yandex Cloud, одна VM**: docker-compose из трёх сервисов (neo4j + backend + frontend/Streamlit); Streamlit наружу на :80, FastAPI на :8000 (§11) | Один деплой-юнит; nginx не нужен: вызовы API идут сервер-сайд, CORS отсутствует; тот же compose поднимается локально |
 | UI-бонус | Готовый Obsidian-плагин (отдельный репозиторий) + материализация — бонус-сцена видео; Neo4j Browser — технический вид графа | Контракт `/graph/subgraph` (§6) фиксирован — плагин подстраивается под него, не наоборот |
 
 ## 3. Модель данных Neo4j
@@ -407,7 +407,7 @@ NL-вопрос
 
 Все шаблоны чтения в `db/queries.py` исключают `deleted=true` и (для partner) `access_level='internal'`.
 
-Фронтенд ходит на same-origin `/api/*` (nginx срезает префикс, §11) — CORS не нужен; Swagger для жюри живёт на `/api/docs`. `X-API-Key` подставляет RoleSwitcher фронтенда (§8.1). Локальная разработка фронта — vite dev-proxy `/api → localhost:8000`.
+Streamlit-фронтенд вызывает API **сервер-сайд** (`httpx` на `http://backend:8000` внутри docker-сети, `BACKEND_URL` из env) — CORS не нужен вовсе, а демо-ключи ролей не попадают в браузер: RoleSwitcher (§8.1) выбирает роль, `X-API-Key` подставляет сервер Streamlit. Swagger для жюри — `http://<ip>:8000/docs`. SSE `/query` читается `httpx.stream()` и транслируется в `st.write_stream`.
 
 ## 7. RBAC и аудит (app-level)
 
@@ -420,28 +420,27 @@ Neo4j Community не имеет RBAC (Enterprise-фича) — разграни�
 
 ## 8. Фронтенд и визуализация
 
-Веб-UI — **основной канал и для жюри, и для видео**. Стек выбран по критерию «команда и LLM-агенты соберут за вечер, выглядит убедительно»: **React 18 + Vite + TypeScript + Tailwind CSS** (SPA, без SSR — он тут не нужен). Ключевые библиотеки:
-- `@microsoft/fetch-event-source` — SSE-стрим `/api/query` (нужны POST + заголовок `X-API-Key`; нативный EventSource этого не умеет);
-- `react-markdown` (+ remark-gfm) — рендер стримящегося ответа и сравнительных таблиц;
-- `react-force-graph-2d` — граф-вьюер (canvas, zero-config, спокойно тянет сотни узлов);
-- `react-router-dom` — 5 экранов.
+Веб-UI — **основной канал и для жюри, и для видео**. **Стек: Streamlit** (решение 03.07 — минимум зависимостей: один язык, +2 строки в pyproject, без node/npm/vite). Роли жёстко разделены: FastAPI-бэкенд — единственный владелец логики, Streamlit — **тонкий HTTP-клиент**. Импортировать модули `backend/app` в Streamlit напрямую **запрещено** — это обход RBAC и аудита.
 
-### 8.1 Экраны
+Зависимости фронта: `streamlit`, `streamlit-agraph` (граф; fallback — `pyvis` через `components.html`), `httpx`.
 
-| Экран | Что показывает | Демо-сцены §13 |
+### 8.1 Страницы (multipage app)
+
+| Страница | Что показывает | Демо-сцены §13 |
 |---|---|---|
-| `/` Чат-поиск | вопрос → chips распознанного плана (intent, фильтры, конвертация единиц «мг/дм³→мг/л» видна глазами) → прогресс шагов конвейера (strict_filters: 87 → semantic: 20 → graph) → стриминг ответа (markdown) → блок цитат `[cite_key]` с карточками документов → кнопки экспорта md/pdf/jsonld | 1, 2, 3, 4 |
-| `/graph` Граф | подграф последнего ответа (SSE-событие `subgraph`) + дозагрузка по клику через `/api/graph/subgraph`. Цвета по label; `CONTRADICTS` — красные рёбра; `needs_review` — пунктир; сущности из топ-пробелов — оранжевые. Клик по узлу → NodeCard: свойства, цитаты, документы, кнопка «править» (analyst+ → `/graph/edit`) | 6 |
-| `/gaps` Пробелы | таблица топ-комбинаций из `/api/gaps` со счётчиками документов/экспериментов | 4 |
-| `/dashboard` | агрегаты `/api/dashboard`: покрытие domain×год, зоны риска, качество данных (роль lead+) | — |
-| `/docs` Документы | drag-n-drop загрузка → отчёт импорта; **алерт `unknown_units`** с YAML-черновиками правил конвертации (§4.3) прямо в UI | — |
+| Чат-поиск | `st.chat_input` → chips распознанного плана (intent, фильтры, конвертация единиц «мг/дм³→мг/л» видна глазами) → `st.status` с шагами конвейера (strict_filters: 87 → semantic: 20 → graph) → `st.write_stream` (markdown-стрим ответа) → цитаты `[cite_key]` в `st.expander`-карточках → `st.download_button` экспорта md/pdf/jsonld | 1, 2, 3, 4 |
+| Граф | подграф последнего ответа (по `query_id` из session_state) в `streamlit-agraph`: цвета по label; `CONTRADICTS` — красные рёбра; `needs_review` — пунктир; сущности из топ-пробелов — оранжевые. Клик по узлу → карточка: свойства, цитаты, документы, кнопка «править» (analyst+ → `/graph/edit`) | 6 |
+| Пробелы | таблица топ-комбинаций из `/gaps` (`st.dataframe`) | 4 |
+| Дашборд | агрегаты `/dashboard`: покрытие domain×год, зоны риска, качество данных (роль lead+) | — |
+| Документы | `st.file_uploader` → отчёт импорта; **алерт `unknown_units`** с YAML-черновиками правил (§4.3) в `st.code` — скопировал в units.yaml и переимпортировал | — |
 
-В шапке — **RoleSwitcher**: выбор роли = подстановка соответствующего `X-API-Key` (демо-ключи пяти ролей зашиты в конфиг фронта, выбор хранится в localStorage). Переключение на partner прямо на глазах жюри убирает internal-источники из выдачи — сцена RBAC без Postman.
+В сайдбаре — **RoleSwitcher**: селектбокс роли; соответствующий `X-API-Key` подставляет **сервер** Streamlit (демо-ключи пяти ролей — в env фронта, в браузер не попадают вообще). Переключение на partner прямо на глазах жюри убирает internal-источники из выдачи — сцена RBAC без Postman.
 
 ### 8.2 Взаимодействие с бэком
 
-- Same-origin: nginx отдаёт статику SPA и проксирует `location /api/ → backend:8000` (префикс срезается) — CORS не нужен. Локальная разработка: vite dev-proxy.
-- Все запросы с `X-API-Key`; ошибки API (инвариант №9) показываются честным тостом «LLM недоступен», без бесконечных спиннеров: таймаут фронта = `LLM_TIMEOUT_S`+запас.
+- Все вызовы — сервер-сайд `httpx` на `BACKEND_URL` (`http://backend:8000` в docker-сети): CORS отсутствует по построению. SSE `/query` — `httpx.stream()` → генератор → `st.write_stream`; события `plan`/`tool_result` рендерятся в `st.status` по мере прихода, `done {query_id}` кладётся в `st.session_state`.
+- **Rerun-модель Streamlit**: скрипт перезапускается на каждый клик — всё живое состояние (история чата, `query_id`, роль) только в `st.session_state`, никаких глобальных переменных.
+- Ошибки API (инвариант №9) — `st.error("LLM недоступен: …")`, без вечных спиннеров; таймаут httpx = `LLM_TIMEOUT_S` + запас.
 - Контракт `subgraph` — §6 `/graph/subgraph`; тот же JSON использует и Obsidian-плагин.
 
 ### 8.3 Вспомогательные виды
@@ -464,7 +463,7 @@ NORNICKEL/
 ├── ARCHITECTURE.md              # этот документ
 ├── README.md                    # быстрый старт + ссылки на демо/презентацию
 ├── README_DEMO.md               # сценарии демо + заготовленные Cypher для Neo4j Browser
-├── docker-compose.yml           # три сервиса: neo4j + backend + frontend/nginx (§11)
+├── docker-compose.yml           # три сервиса: neo4j + backend + frontend/Streamlit (§11)
 ├── .env.example                 # все переменные §11
 ├── backend/
 │   ├── pyproject.toml           # Poetry: зависимости и версии
@@ -544,27 +543,24 @@ NORNICKEL/
 │       ├── test_canonizer.py    # никель/Ni/nickel → один canonical_id; lookup() без записи
 │       ├── test_intervals.py    # операторы→интервалы; пересечения; «около 0», «около −40»
 │       └── test_tools.py        # контракты 4 инструментов на демо-графе
-├── frontend/                    # ВЕБ-UI (§8): React 18 + Vite + TypeScript + Tailwind
-│   ├── package.json             # + lock-файл коммитится в git
-│   ├── vite.config.ts           # dev-proxy /api → localhost:8000
-│   ├── Dockerfile               # multi-stage: node:20 build → nginx:alpine
-│   ├── nginx.conf               # статика SPA + location /api/ → backend:8000
-│   │                            #   (+ client_max_body_size 50m для загрузки PDF)
-│   └── src/
-│       ├── main.tsx / App.tsx   # react-router: / /graph /gaps /dashboard /docs
-│       ├── api/client.ts        # fetch-обёртка: X-API-Key из localStorage; SSE через
-│       │                        #   @microsoft/fetch-event-source; таймауты (инвариант №9)
-│       └── components/
-│           ├── ChatPanel.tsx    # план-chips, прогресс шагов конвейера,
-│           │                    #   markdown-стрим, кнопки экспорта
-│           ├── Citations.tsx    # [cite_key] → карточка документа
-│           ├── GraphView.tsx    # react-force-graph-2d; CONTRADICTS красным,
-│           │                    #   needs_review пунктиром, топ-пробелы оранжевым
-│           ├── NodeCard.tsx     # свойства узла, цитаты, кнопка «править» (/graph/edit)
-│           ├── UploadDoc.tsx    # drag-n-drop + отчёт импорта + алерт unknown_units
-│           ├── GapsTable.tsx
-│           ├── DashboardTables.tsx
-│           └── RoleSwitcher.tsx # роль = X-API-Key; демо RBAC прямо из UI
+├── frontend/                    # ВЕБ-UI (§8): Streamlit — тонкий клиент над REST API
+│   ├── pyproject.toml           # свой мини-проект Poetry: streamlit, streamlit-agraph, httpx
+│   ├── poetry.lock
+│   ├── Dockerfile               # python:3.11-slim + poetry install; streamlit run app.py
+│   ├── app.py                   # входная точка: навигация по страницам, RoleSwitcher
+│   │                            #   в сайдбаре, инициализация session_state
+│   ├── api_client.py            # httpx-обёртка: BACKEND_URL, X-API-Key по выбранной роли
+│   │                            #   (ключи из env, в браузер не попадают); SSE-генератор
+│   │                            #   для st.write_stream; таймауты (инвариант №9)
+│   └── pages/
+│       ├── 1_chat.py            # план-chips, st.status шагов конвейера,
+│       │                        #   st.write_stream, цитаты, кнопки экспорта
+│       ├── 2_graph.py           # streamlit-agraph: CONTRADICTS красным, needs_review
+│       │                        #   пунктиром, топ-пробелы оранжевым; клик → карточка
+│       │                        #   узла + «править» (/graph/edit, analyst+)
+│       ├── 3_gaps.py            # таблица топ-комбинаций
+│       ├── 4_dashboard.py       # агрегаты (роль lead+)
+│       └── 5_documents.py       # загрузка + отчёт импорта + алерт unknown_units
 ├── niokr_rag/                   # прежний RAG MVP — не трогаем (паттерн канонизации перенесён)
 └── obsidian-plugin/             # отдельный репозиторий (ссылка в README)
 ```
@@ -592,16 +588,16 @@ OBSIDIAN_VAULT_PATH=                   # пусто = materializer отключ�
 docker-compose.yml:
   neo4j:     neo4j:5.26-community; NEO4J_PLUGINS=["apoc"]; volume на данные; heap ~2G
   backend:   build backend/ (Dockerfile: poetry install --only main + pandoc);
-             uvicorn workers=1; env из .env
-  frontend:  build frontend/ (multi-stage: node:20 build → nginx:alpine);
-             nginx.conf: статика SPA + location /api/ { proxy_pass http://backend:8000/; }
-             (срезает префикс; proxy_buffering off — иначе SSE не стримится!);
-             порт 80 наружу
+             uvicorn workers=1; env из .env; порт 8000 наружу (Swagger /docs для жюри)
+  frontend:  build frontend/ (python:3.11-slim + poetry install);
+             streamlit run app.py --server.port 80 --server.address 0.0.0.0;
+             env: BACKEND_URL=http://backend:8000 + демо-ключи пяти ролей;
+             порт 80 наружу (nginx не нужен: API-вызовы сервер-сайд, CORS нет)
 ```
 
 Шаги деплоя (`README.md`, ~30 минут): создать VM в консоли Yandex Cloud → docker + compose → `git clone` → `.env` из `.env.example` (ключи YC, пароль Neo4j, API-ключи ролей) → `docker compose up -d --build` → `scripts/init_db.py` + `load_references.py` + `ingest_corpus.py` (или восстановить дамп `dump_db.sh`) → проверить `GET /health`.
 
-Жюри получает: `http://<vm-ip>/` — веб-UI с RoleSwitcher (ничего не устанавливая), `http://<vm-ip>/api/docs` — Swagger, `http://<vm-ip>:7474` — Neo4j Browser (read-only пользователь) для любопытных. HTTPS/домен — опционально (Caddy + nip.io), время на это не тратим, если не остаётся.
+Жюри получает: `http://<vm-ip>/` — Streamlit-UI с RoleSwitcher (ничего не устанавливая), `http://<vm-ip>:8000/docs` — Swagger, `http://<vm-ip>:7474` — Neo4j Browser (read-only пользователь) для любопытных. HTTPS/домен — опционально (Caddy + nip.io), время на это не тратим, если не остаётся.
 
 **Два профиля запуска:**
 - **demo-local** (запись видео): тот же docker-compose на ноутбуке (веб-UI — основной кадр); опционально `OBSIDIAN_VAULT_PATH` → локальный vault для бонус-сцены материализации.
@@ -621,14 +617,14 @@ docker-compose.yml:
 5. [A] Index Agent (§4) целиком; числовой контур (validator+units, включая алерт `unknown_units`) — не срезать.
 6. [A] `ingest_corpus.py` на демо-корпусе; `detect_contradictions.py` (только эвристика) + `seed_demo.py`.
 7. [A] Active Agent Pipeline (§5): planner → 4 инструмента → синтез SSE.
-8. [B] **Фронтенд-ядро** (§8, параллельно с 5–7): каркас Vite+React+Tailwind, `api/client.ts` (X-API-Key + SSE), RoleSwitcher, ChatPanel с план-chips, прогрессом шагов, markdown-стримом и цитатами. Это лицо демо — приоритет не ниже бэкового ядра.
+8. [B] **Фронтенд-ядро** (§8, параллельно с 5–7): каркас Streamlit (`app.py` + `api_client.py` + RoleSwitcher в сайдбаре), страница чата: план-chips, `st.status` шагов, `st.write_stream`, цитаты. Это лицо демо — приоритет не ниже бэкового ядра.
 9. [A] Тесты `test_units/test_intervals/test_canonizer` (спасают от тихих ошибок в числах).
 
 **P2 — обвязка (вечер):**
 10. [A] RBAC + аудит (§7).
 11. [A] `/export` (md+jsonld+pdf), `/dashboard`, `/gaps`, подписки-PoC.
-12. [B] **Фронтенд-обвязка**: GraphView + NodeCard, UploadDoc с алертом `unknown_units`, GapsTable, DashboardTables.
-13. [A+B] **Деплой на Yandex Cloud VM** (§11): Dockerfile'ы (backend: poetry+pandoc; frontend: node→nginx), docker-compose, `.env`, импорт корпуса на VM, `dump_db.sh`, `GET /health` в чек-листе (инвариант №9).
+12. [B] **Фронтенд-обвязка**: страница графа (streamlit-agraph + карточка узла), документы с алертом `unknown_units`, пробелы, дашборд.
+13. [A+B] **Деплой на Yandex Cloud VM** (§11): Dockerfile'ы (backend: poetry+pandoc; frontend: poetry+streamlit), docker-compose, `.env`, импорт корпуса на VM, `dump_db.sh`, `GET /health` в чек-листе (инвариант №9).
 14. Cypher-заготовки `README_DEMO.md` (Neo4j Browser — запасной вид); материализация в Obsidian — бонус, только если остаётся время.
 15. **Презентация**: архитектура, метрики §5.4, RBAC-прод, слайд «развитие» + прогон.
 16. Опция (таймбокс 1ч): `gen_synthetic.py` + PROFILE на ~1 млн узлов → цифры в слайд; не успели — убрать претензию «на миллионе» из слайдов.
