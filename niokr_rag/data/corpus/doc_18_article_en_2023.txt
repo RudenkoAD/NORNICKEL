@@ -1,0 +1,10 @@
+---
+title: Effect of flotation time and froth depth on recovery and selectivity
+doc_type: article
+lang: en
+year: 2023
+authority: normal
+---
+Flotation time and froth depth jointly control the trade-off between recovery and concentrate grade. Longer flotation time increases cumulative nickel recovery but eventually pulls more pyrrhotite and gangue into the concentrate, lowering selectivity.
+
+A deeper froth zone enhances drainage of entrained gangue, improving grade at a modest cost in recovery. For nickel ores with high pyrrhotite, a staged approach — shorter primary flotation time with controlled froth depth followed by a scavenger stage — is reported to balance recovery and selectivity better than a single long flotation step.

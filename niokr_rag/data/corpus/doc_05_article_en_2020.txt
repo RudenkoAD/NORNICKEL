@@ -1,0 +1,10 @@
+---
+title: Mechanisms of pyrrhotite depression in sulfide flotation
+doc_type: article
+lang: en
+year: 2020
+authority: normal
+---
+Pyrrhotite depression is central to selective nickel flotation. Several mechanisms are reported. First, high-pH lime addition forms hydrophilic iron hydroxide layers that render the pyrrhotite surface non-floatable. Second, oxidative treatment, including sulfur dioxide and oxygen conditioning, produces hydrophilic oxidation products on the mineral surface.
+
+These oxidation-based routes can depress pyrrhotite without pushing pH to the very high values required by lime alone, which is attractive when high pH adversely affects other valuable minerals. The choice between lime-based and oxidation-based depression depends on ore mineralogy and on the sensitivity of copper minerals to elevated pH.

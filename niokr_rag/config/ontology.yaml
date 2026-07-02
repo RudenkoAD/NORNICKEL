@@ -1,0 +1,112 @@
+# Доменная онтология для передела «флотация сульфидных Ni-Cu руд».
+# Используется словарным NER (longest-match по synonyms, рус+англ) и графом ABC.
+# type: metal | mineral | reagent | process | parameter | equipment
+# Поля: entity_id, canonical_ru, canonical_en, type, synonyms[], unit?, parent_id?
+entities:
+  # --- Металлы ---
+  - {entity_id: metal.Ni, canonical_ru: "никель", canonical_en: "nickel", type: metal,
+     synonyms: ["никель", "никеля", "никелевый", "Ni", "nickel"]}
+  - {entity_id: metal.Cu, canonical_ru: "медь", canonical_en: "copper", type: metal,
+     synonyms: ["медь", "меди", "медный", "Cu", "copper"]}
+  - {entity_id: metal.Pt, canonical_ru: "платина", canonical_en: "platinum", type: metal,
+     synonyms: ["платина", "платины", "Pt", "platinum"]}
+  - {entity_id: metal.Pd, canonical_ru: "палладий", canonical_en: "palladium", type: metal,
+     synonyms: ["палладий", "палладия", "Pd", "palladium"]}
+  - {entity_id: metal.Co, canonical_ru: "кобальт", canonical_en: "cobalt", type: metal,
+     synonyms: ["кобальт", "кобальта", "Co", "cobalt"]}
+  - {entity_id: metal.S, canonical_ru: "сера", canonical_en: "sulfur", type: metal,
+     synonyms: ["сера", "серы", "сернистый", "sulfur", "sulphur"]}
+
+  # --- Минералы ---
+  - {entity_id: mineral.pentlandite, canonical_ru: "пентландит", canonical_en: "pentlandite", type: mineral,
+     synonyms: ["пентландит", "пентландита", "pentlandite", "(Fe,Ni)9S8"]}
+  - {entity_id: mineral.chalcopyrite, canonical_ru: "халькопирит", canonical_en: "chalcopyrite", type: mineral,
+     synonyms: ["халькопирит", "халькопирита", "chalcopyrite", "CuFeS2"]}
+  - {entity_id: mineral.pyrrhotite, canonical_ru: "пирротин", canonical_en: "pyrrhotite", type: mineral,
+     synonyms: ["пирротин", "пирротина", "пирротиновый", "pyrrhotite", "Fe(1-x)S"]}
+  - {entity_id: mineral.pyrite, canonical_ru: "пирит", canonical_en: "pyrite", type: mineral,
+     synonyms: ["пирит", "пирита", "pyrite", "FeS2"]}
+  - {entity_id: mineral.talc, canonical_ru: "тальк", canonical_en: "talc", type: mineral,
+     synonyms: ["тальк", "талька", "talc"]}
+  - {entity_id: mineral.gangue, canonical_ru: "пустая порода", canonical_en: "gangue", type: mineral,
+     synonyms: ["пустая порода", "силикаты", "вмещающие породы", "gangue", "silicates"]}
+
+  # --- Реагенты: собиратели ---
+  - {entity_id: reagent.xanthate, canonical_ru: "ксантогенат", canonical_en: "xanthate", type: reagent,
+     synonyms: ["ксантогенат", "ксантогената", "ксантогенаты", "xanthate", "xanthates"]}
+  - {entity_id: reagent.xanthate.SIBX, canonical_ru: "бутиловый ксантогенат калия", canonical_en: "potassium butyl xanthate", type: reagent,
+     synonyms: ["бутиловый ксантогенат калия", "бутиловый ксантогенат", "БКК", "SIBX", "PIBX", "potassium butyl xanthate"], parent_id: reagent.xanthate}
+  - {entity_id: reagent.xanthate.SIPX, canonical_ru: "изопропиловый ксантогенат", canonical_en: "isopropyl xanthate", type: reagent,
+     synonyms: ["изопропиловый ксантогенат", "SIPX", "isopropyl xanthate"], parent_id: reagent.xanthate}
+  - {entity_id: reagent.dtp, canonical_ru: "дитиофосфат", canonical_en: "dithiophosphate", type: reagent,
+     synonyms: ["дитиофосфат", "аэрофлот", "dithiophosphate", "aerophine"]}
+  - {entity_id: reagent.ddc, canonical_ru: "диэтилдитиокарбамат", canonical_en: "diethyldithiocarbamate", type: reagent,
+     synonyms: ["диэтилдитиокарбамат", "дитиокарбамат", "diethyldithiocarbamate", "DEDTC"]}
+
+  # --- Реагенты: вспениватели ---
+  - {entity_id: reagent.frother.mibc, canonical_ru: "метилизобутилкарбинол", canonical_en: "MIBC", type: reagent,
+     synonyms: ["метилизобутилкарбинол", "МИБК", "MIBC", "вспениватель"]}
+  - {entity_id: reagent.frother.pineoil, canonical_ru: "сосновое масло", canonical_en: "pine oil", type: reagent,
+     synonyms: ["сосновое масло", "pine oil", "Т-80", "Т-92"]}
+
+  # --- Реагенты: депрессоры ---
+  - {entity_id: reagent.depressant.lime, canonical_ru: "известь", canonical_en: "lime", type: reagent,
+     synonyms: ["известь", "извести", "известью", "гашёная известь", "CaO", "Ca(OH)2", "lime"]}
+  - {entity_id: reagent.depressant.cmc, canonical_ru: "карбоксиметилцеллюлоза", canonical_en: "carboxymethylcellulose", type: reagent,
+     synonyms: ["карбоксиметилцеллюлоза", "КМЦ", "CMC", "carboxymethylcellulose"]}
+  - {entity_id: reagent.depressant.so2, canonical_ru: "сернистый газ", canonical_en: "sulfur dioxide", type: reagent,
+     synonyms: ["сернистый газ", "диоксид серы", "сернистый ангидрид", "SO2", "sulfur dioxide", "sulphur dioxide"]}
+  - {entity_id: reagent.depressant.sulfite, canonical_ru: "сульфит натрия", canonical_en: "sodium sulfite", type: reagent,
+     synonyms: ["сульфит натрия", "Na2SO3", "sodium sulfite", "sodium sulphite"]}
+  - {entity_id: reagent.depressant.dextrin, canonical_ru: "декстрин", canonical_en: "dextrin", type: reagent,
+     synonyms: ["декстрин", "dextrin"]}
+
+  # --- Реагенты: активаторы / регуляторы ---
+  - {entity_id: reagent.activator.cuso4, canonical_ru: "медный купорос", canonical_en: "copper sulfate", type: reagent,
+     synonyms: ["медный купорос", "сульфат меди", "CuSO4", "copper sulfate", "copper sulphate"]}
+
+  # --- Процессы ---
+  - {entity_id: process.flotation, canonical_ru: "флотация", canonical_en: "flotation", type: process,
+     synonyms: ["флотация", "флотации", "флотационный", "flotation"]}
+  - {entity_id: process.grinding, canonical_ru: "измельчение", canonical_en: "grinding", type: process,
+     synonyms: ["измельчение", "помол", "grinding", "milling"]}
+  - {entity_id: process.conditioning, canonical_ru: "кондиционирование", canonical_en: "conditioning", type: process,
+     synonyms: ["кондиционирование", "агитация", "conditioning"]}
+  - {entity_id: process.oxidation, canonical_ru: "окисление", canonical_en: "oxidation", type: process,
+     synonyms: ["окисление", "окислительное кондиционирование", "oxidation", "oxidative conditioning"]}
+  - {entity_id: process.autoclave, canonical_ru: "автоклавное окисление", canonical_en: "pressure oxidation", type: process,
+     synonyms: ["автоклавное окисление", "автоклав", "POX", "pressure oxidation", "autoclave"]}
+  - {entity_id: process.smelting, canonical_ru: "плавка", canonical_en: "smelting", type: process,
+     synonyms: ["плавка", "плавки", "пирометаллургия", "smelting"]}
+
+  # --- Параметры / отклики ---
+  - {entity_id: param.pH, canonical_ru: "pH пульпы", canonical_en: "pulp pH", type: parameter,
+     synonyms: ["pH", "рН", "pH пульпы", "кислотность", "pulp pH"], unit: "pH"}
+  - {entity_id: param.Eh, canonical_ru: "окислительно-восстановительный потенциал", canonical_en: "redox potential", type: parameter,
+     synonyms: ["Eh", "ОВП", "редокс-потенциал", "окислительно-восстановительный потенциал", "redox potential"], unit: "mV"}
+  - {entity_id: param.temperature, canonical_ru: "температура", canonical_en: "temperature", type: parameter,
+     synonyms: ["температура", "температуры", "temperature"], unit: "°C"}
+  - {entity_id: param.dosage, canonical_ru: "дозировка реагента", canonical_en: "reagent dosage", type: parameter,
+     synonyms: ["дозировка", "расход реагента", "расход собирателя", "dosage", "dosage rate"], unit: "г/т"}
+  - {entity_id: param.recovery, canonical_ru: "извлечение", canonical_en: "recovery", type: parameter,
+     synonyms: ["извлечение", "извлечения", "recovery"], unit: "%"}
+  - {entity_id: param.grade, canonical_ru: "содержание в концентрате", canonical_en: "concentrate grade", type: parameter,
+     synonyms: ["содержание", "качество концентрата", "grade", "concentrate grade"], unit: "%"}
+  - {entity_id: param.selectivity, canonical_ru: "селективность", canonical_en: "selectivity", type: parameter,
+     synonyms: ["селективность", "селективности", "selectivity"]}
+  - {entity_id: param.particle_size, canonical_ru: "крупность помола", canonical_en: "particle size", type: parameter,
+     synonyms: ["крупность", "тонина помола", "P80", "particle size", "grind size"], unit: "мкм"}
+  - {entity_id: param.flotation_time, canonical_ru: "время флотации", canonical_en: "flotation time", type: parameter,
+     synonyms: ["время флотации", "продолжительность флотации", "flotation time"], unit: "мин"}
+  - {entity_id: param.reagent_consumption, canonical_ru: "расход реагентов", canonical_en: "reagent consumption", type: parameter,
+     synonyms: ["расход реагентов", "расход", "reagent consumption"], unit: "г/т"}
+  - {entity_id: param.energy, canonical_ru: "энергозатраты", canonical_en: "energy consumption", type: parameter,
+     synonyms: ["энергозатраты", "расход энергии", "энергопотребление", "energy consumption"], unit: "кВт·ч/т"}
+  - {entity_id: param.so2_emission, canonical_ru: "выбросы SO2", canonical_en: "SO2 emissions", type: parameter,
+     synonyms: ["выбросы SO2", "выбросы диоксида серы", "SO2 emissions"], unit: "т"}
+
+  # --- Оборудование ---
+  - {entity_id: equip.flotation_cell, canonical_ru: "флотомашина", canonical_en: "flotation cell", type: equipment,
+     synonyms: ["флотомашина", "флотационная машина", "флотокамера", "flotation cell"]}
+  - {entity_id: equip.ball_mill, canonical_ru: "шаровая мельница", canonical_en: "ball mill", type: equipment,
+     synonyms: ["шаровая мельница", "мельница", "ball mill"]}

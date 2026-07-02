@@ -1,0 +1,26 @@
+# On-prem развёртывание в закрытом контуре: UI + локальная LLM Ollama.
+# Запуск:  docker compose up --build
+# После старта один раз подтянуть модель:
+#   docker compose exec ollama ollama pull qwen2.5:14b-instruct
+services:
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+
+  app:
+    build: .
+    depends_on:
+      - ollama
+    environment:
+      NIOKR_OLLAMA_URL: http://ollama:11434
+      NIOKR_OLLAMA_MODEL: qwen2.5:14b-instruct
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./data:/app/data        # корпус и индекс наружу для обновления
+
+volumes:
+  ollama_models:

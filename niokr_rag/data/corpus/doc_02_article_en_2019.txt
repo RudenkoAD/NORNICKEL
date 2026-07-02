@@ -1,0 +1,10 @@
+---
+title: Pulp chemistry control in sulfide flotation: pH and Eh
+doc_type: article
+lang: en
+year: 2019
+authority: normal
+---
+The selectivity of sulfide flotation is strongly governed by pulp chemistry, in particular pH and the redox potential (Eh). Raising the pulp pH with lime above 11 promotes the formation of hydrophilic iron-oxidation products on iron sulfides such as pyrrhotite and pyrite, depressing their flotation while pentlandite and chalcopyrite remain floatable with xanthate collectors.
+
+Eh is an equally important but often overlooked variable. Controlled oxidative conditioning shifts the pulp potential and accelerates surface oxidation of pyrrhotite. Maintaining a moderately oxidizing potential improves the separation of nickel-bearing pentlandite from pyrrhotite. Reported gains in Ni selectivity are typically in the range of 1-3 percentage points when pH and Eh are jointly controlled.

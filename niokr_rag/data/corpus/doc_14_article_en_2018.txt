@@ -1,0 +1,10 @@
+---
+title: Diethyldithiocarbamate as a selective collector for nickel sulfides
+doc_type: article
+lang: en
+year: 2018
+authority: normal
+---
+Diethyldithiocarbamate (DEDTC) is a thiol collector with higher selectivity for pentlandite over pyrrhotite compared with conventional xanthates. Its stronger affinity for nickel-bearing sulfides can improve nickel selectivity, particularly in ores where pyrrhotite floats readily.
+
+Used as a supplementary collector alongside butyl xanthate, DEDTC can raise nickel recovery and grade without a large increase in total collector dosage. Reported applications use small additions of 5-15 g/t DEDTC on top of the primary xanthate collector.

@@ -1,0 +1,30 @@
+# Веса прозрачного скоринга. Редактируются слайдерами в UI; смена весов
+# пересчитывает total БЕЗ повторного retrieval.
+# Положительные веса нормированы к сумме 1; риск входит со штрафом.
+top:
+  w_novelty: 0.30
+  w_value: 0.30
+  w_testability: 0.25
+  w_risk: 0.15            # штраф (вычитается)
+
+# Под-веса компонентов (см. scoring.py и раздел 4.5 плана).
+novelty:
+  w_corpus_distance: 0.7   # 1 - макс. близость к утверждениям корпуса
+  w_combination_rarity: 0.3
+  abc_bonus: 0.2           # бонус за гипотезу из ABC-связи
+
+value:
+  w_kpi_alignment: 0.5
+  w_effect_magnitude: 0.3
+  w_source_authority: 0.2
+
+testability:
+  w_measurable_metric: 0.4
+  w_controllable_factors: 0.3
+  w_feasibility: 0.3
+
+risk:
+  w_unfaithful: 0.4        # 1 - средняя faithfulness
+  w_ungrounded: 0.3        # доля утверждений без подтверждённой цитаты
+  w_extrapolation: 0.2
+  w_contradiction: 0.1

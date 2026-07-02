@@ -1,0 +1,17 @@
+# Эталонный набор для метрик retrieval (recall@k, MRR) и faithfulness.
+# relevant_docs — doc_id источников, которые должны попадать в выдачу по KPI.
+cases:
+  - kpi: "Повысить извлечение никеля во флотации сульфидной Ni-Cu руды на +3 п.п. без увеличения расхода собирателя; высокое содержание пирротина"
+    relevant_docs: [doc_07_report_ru_2019, doc_04_report_ru_2018, doc_05_article_en_2020, doc_12_article_en_2021, doc_02_article_en_2019, doc_03_protocol_ru_2020]
+
+  - kpi: "Снизить расход реагентов во флотации без потери извлечения меди"
+    relevant_docs: [doc_16_report_ru_2022, doc_08_article_ru_2017, doc_10_article_en_2022]
+
+  - kpi: "Снизить выбросы SO2 за счёт более глубокой депрессии пирротина во флотации"
+    relevant_docs: [doc_16_report_ru_2022, doc_12_article_en_2021, doc_17_doe_ru_2021]
+
+  - kpi: "Повысить селективность флотации по никелю относительно пирротина"
+    relevant_docs: [doc_05_article_en_2020, doc_12_article_en_2021, doc_14_article_en_2018, doc_15_patent_ru_2017, doc_13_report_ru_2016]
+
+  - kpi: "Подобрать селективный собиратель для пентландита в присутствии пирротина"
+    relevant_docs: [doc_14_article_en_2018, doc_15_patent_ru_2017, doc_01_article_ru_2018]

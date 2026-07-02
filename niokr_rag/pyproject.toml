@@ -1,0 +1,44 @@
+[project]
+name = "niokr-rag"
+version = "0.1.0"
+description = "Интерпретируемый ИИ-инструмент генерации и ранжирования НИОКР-гипотез (RAG-центричный MVP)"
+authors = [{ name = "NORNICKEL R&D" }]
+readme = "README.md"
+requires-python = ">=3.10,<4.0"
+dependencies = [
+    "pydantic (>=2.5)",
+    "pyyaml (>=6.0)",
+    "numpy (>=1.24)",
+    "rank-bm25 (>=0.2.2)",
+    "networkx (>=3.1)",
+]
+
+[tool.poetry]
+packages = [{ include = "niokr", from = "src" }]
+
+# --- dev: ставится вместе с `poetry install` ---
+[tool.poetry.group.dev.dependencies]
+pytest = ">=7.4"
+
+# --- опциональные группы: `poetry install --with ui` / `--with pdf` ---
+[tool.poetry.group.ui]
+optional = true
+[tool.poetry.group.ui.dependencies]
+streamlit = ">=1.33"
+
+[tool.poetry.group.pdf]
+optional = true
+[tool.poetry.group.pdf.dependencies]
+pypdf = ">=4.0"
+
+# Качественные многоязычные эмбеддинги (BGE-M3) тянут torch и платформо-зависимы,
+# поэтому ставятся в venv Poetry отдельно (см. README):
+#   poetry run pip install sentence-transformers faiss-cpu
+
+[build-system]
+requires = ["poetry-core>=2.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

@@ -1,0 +1,10 @@
+---
+title: Selective depression of talc and gangue with carboxymethylcellulose
+doc_type: article
+lang: en
+year: 2022
+authority: normal
+---
+Naturally floatable gangue minerals such as talc dilute nickel concentrates and increase reagent consumption. Carboxymethylcellulose (CMC) is an effective depressant for talc and magnesium silicate gangue. Adsorption of CMC renders the gangue surface hydrophilic, reducing its recovery into the froth.
+
+Dosages of 100-300 g/t CMC are typical. Proper gangue depression improves concentrate grade and can indirectly raise apparent nickel selectivity by reducing entrainment, though it does not by itself address pyrrhotite, which requires pH or oxidation control.

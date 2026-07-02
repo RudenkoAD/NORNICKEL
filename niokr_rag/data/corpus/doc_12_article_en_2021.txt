@@ -1,0 +1,10 @@
+---
+title: SO2/oxygen conditioning for pyrrhotite depression and pentlandite selectivity
+doc_type: article
+lang: en
+year: 2021
+authority: normal
+---
+This study examined sulfur dioxide / oxygen (SO2/O2) conditioning as a route to depress pyrrhotite during nickel flotation. Elevated pulp pH (>11) combined with SO2/oxygen conditioning depresses pyrrhotite by forming hydrophilic oxidation products on its surface, improving Ni-bearing pentlandite selectivity.
+
+A key advantage is that oxidative conditioning controls the pulp redox potential (Eh) and can achieve pyrrhotite depression at a more moderate pH than lime alone. This is desirable when very high pH would otherwise depress copper minerals. Pentlandite selectivity improved while maintaining copper recovery, suggesting SO2/O2 conditioning as a complementary or alternative depression strategy.

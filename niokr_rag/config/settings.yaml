@@ -1,0 +1,52 @@
+# Глобальные настройки инструмента. Пути — относительно корня niokr_rag/.
+paths:
+  corpus: data/corpus
+  index: data/index
+  audit: data/audit
+  eval: data/eval/eval_set.yaml
+  ontology: config/ontology.yaml
+  weights: config/weights.yaml
+
+ingestion:
+  chunk_tokens: 180          # целевой размер чанка (приближённо в «словах»)
+  chunk_overlap: 40          # перекрытие между чанками
+  min_chunk_chars: 80        # чанки короче — отбрасываются
+
+embeddings:
+  # auto: попытаться загрузить sentence-transformers, иначе hash-fallback.
+  # Значения: auto | sstransformers | hash
+  backend: auto
+  model: BAAI/bge-m3
+  dim: 512                   # размерность hash-fallback эмбеддинга
+
+retrieval:
+  top_k_dense: 15
+  top_k_bm25: 15
+  rrf_k: 60                  # константа reciprocal rank fusion
+  final_top_k: 12            # сколько чанков уходит в контекст генератора
+  use_reranker: false        # cross-encoder reranking (тяжело, по умолчанию выкл.)
+  reranker_model: BAAI/bge-reranker-v2-m3
+
+abc_lbd:
+  enabled: true
+  min_edge_weight: 1         # минимальная совстречаемость для ребра графа
+  max_links: 5               # сколько ABC-связей передавать как seed
+  direct_max_weight: 2       # C считается «скрытым», только если прямая связь A-C слабее
+
+generation:
+  # Основной режим — локальная LLM через Ollama. Переключатель на template-режим.
+  use_llm: true
+  ollama_url: http://localhost:11434
+  ollama_model: qwen2.5:14b-instruct
+  temperature: 0.0           # детерминизм
+  timeout_s: 120
+  n_hypotheses: 5            # сколько гипотез генерировать
+
+verifier:
+  faithfulness_threshold: 0.55   # ниже — утверждение считается неподтверждённым
+
+scoring:
+  novelty_sim_threshold: 0.85    # выше близость к корпусу — ниже новизна
+
+run:
+  seed: 42
