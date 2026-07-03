@@ -74,12 +74,32 @@ class _TooLong(Exception):
 # Глобальный колпак параллельных эмбеддинг-вызовов НА ПРОЦЕСС (03.07): конкурентность
 # по документам (4) × embed_docs (8) давала до 32 одновременных запросов → 429.
 _GLOBAL_EMB_SEMAPHORE: Optional[asyncio.Semaphore] = None
-_GLOBAL_EMB_LIMIT = 6
+_GLOBAL_EMB_LIMIT = 3  # 04.07: 6 не хватило — журнал (40 чанков) выбивал квоту
 
-# 429 — не отказ сервиса, а сигнал «притормози»: до 3 повторов с паузами.
-# Суммарно ~17 c худшего случая — для офлайн-импорта нормально, онлайн-запрос
-# делает 1-2 эмбеддинга и в 429 практически не попадает (§5.2).
-_RATE_LIMIT_SLEEPS = (2.0, 5.0, 10.0)
+# 429 — не отказ сервиса, а сигнал «притормози». 04.07: паузы удлинены до 40с —
+# у выпуска журнала 40 эмбеддингов встают в очередь одновременно, и короткие паузы
+# истекали раньше, чем квота освобождалась. Онлайн-запрос (§5.2) делает 1-2 вызова
+# и до длинных пауз не доходит.
+_RATE_LIMIT_SLEEPS = (2.0, 5.0, 10.0, 20.0, 40.0)
+
+# Глобальный минимальный интервал между СТАРТАМИ запросов (token-bucket на процесс):
+# защищает квоту RPS независимо от степени параллельности вызывающих.
+_MIN_INTERVAL_S = 0.15
+_PACE_LOCK: Optional[asyncio.Lock] = None
+_last_start = 0.0
+
+
+async def _pace() -> None:
+    global _PACE_LOCK, _last_start
+    if _PACE_LOCK is None:
+        _PACE_LOCK = asyncio.Lock()
+    async with _PACE_LOCK:
+        import time as _time
+        now = _time.monotonic()
+        wait = _MIN_INTERVAL_S - (now - _last_start)
+        if wait > 0:
+            await asyncio.sleep(wait)
+        _last_start = _time.monotonic()
 
 
 def _emb_semaphore() -> asyncio.Semaphore:
@@ -112,6 +132,7 @@ async def _embed(text: str, model_type: str, client: Optional[httpx.AsyncClient]
     async def _do(cl: httpx.AsyncClient) -> list[float]:
         payload = {"modelUri": _model_uri(model_type, settings), "text": emb_text}
         async with _emb_semaphore():
+            await _pace()  # межзапросный интервал — защита квоты RPS (04.07)
             resp = await cl.post(YANDEX_EMBEDDING_URL, headers=headers, json=payload)
         if resp.status_code == 429:
             raise _RateLimited()
