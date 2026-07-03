@@ -80,6 +80,7 @@ async def process_document(
     dry_run: bool,
     force: bool = False,
     doc_timeout: float = 600.0,
+    defer_embeddings: bool = False,
 ) -> dict[str, Any]:
     """Прогоняет один файл через весь конвейер §4. Возвращает per-doc отчёт.
 
@@ -229,11 +230,18 @@ async def process_document(
         return doc_report
 
     # [9] embedder: эмбеддинги чанков + summary документа. Одна модель везде (инвариант №7).
-    chunk_texts = [getattr(c, "text", "") for c in chunks]
-    chunk_embeddings = await emb_mod.embed_docs(chunk_texts) if chunk_texts else []
-    summary_text = doc_meta["summary"] or doc_meta["title"]
-    doc_embedding = await emb_mod.embed_doc(summary_text)
-    doc_meta["embedding"] = doc_embedding
+    # --defer-embeddings (04.07): при выбитой часовой квоте эмбеддингов корпус едет
+    # на экстракции (chat-квота отдельная), вектора доливает scripts/embed_pending.py
+    # по мере оживания квоты (узлы без свойства embedding просто не в vector-индексе).
+    if defer_embeddings:
+        chunk_embeddings: list[list[float]] = []
+        doc_embedding = None
+    else:
+        chunk_texts = [getattr(c, "text", "") for c in chunks]
+        chunk_embeddings = await emb_mod.embed_docs(chunk_texts) if chunk_texts else []
+        summary_text = doc_meta["summary"] or doc_meta["title"]
+        doc_embedding = await emb_mod.embed_doc(summary_text)
+        doc_meta["embedding"] = doc_embedding
 
     # [10] writer: идемпотентная транзакционная запись (§4.5). Канонизация — внутри writer.
     # to_thread: синхронный драйвер Neo4j (сотни statements с 256-d embedding — единицы
@@ -347,6 +355,7 @@ async def run_ingest(
     model: Optional[str] = None,
     llm_timeout: Optional[float] = None,
     doc_timeout: float = 600.0,
+    defer_embeddings: bool = False,
 ) -> dict[str, Any]:
     """Главный конвейер импорта корпуса с семафором по документам.
 
@@ -394,6 +403,7 @@ async def run_ingest(
                     dry_run=dry_run,
                     force=force,
                     doc_timeout=doc_timeout,
+                    defer_embeddings=defer_embeddings,
                 )
                 doc_reports.append(rep)
                 log.info(
@@ -520,6 +530,8 @@ def main() -> int:
                          "(второй проход: qwen3-235b-a22b-fp8/latest)")
     ap.add_argument("--llm-timeout", type=float, default=None,
                     help="таймаут LLM, сек (второй проход qwen: 300)")
+    ap.add_argument("--defer-embeddings", action="store_true",
+                    help="писать без векторов (квота эмбеддингов); долить: embed_pending.py")
     ap.add_argument("--doc-timeout", type=float, default=600.0,
                     help="пол сторожевого таймаута экстракции, сек; фактический масштабируется от числа чанков (04.07)")
     args = ap.parse_args()
@@ -540,6 +552,7 @@ def main() -> int:
                 model=args.model,
                 llm_timeout=args.llm_timeout,
                 doc_timeout=args.doc_timeout,
+                defer_embeddings=args.defer_embeddings,
             )
         )
     except Exception as err:  # noqa: BLE001 — фатальная ошибка конвейера (не отдельного документа)
