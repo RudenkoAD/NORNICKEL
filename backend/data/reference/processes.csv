@@ -1,0 +1,54 @@
+# processes.csv — справочник ПРОЦЕССОВ (ARCHITECTURE.md §3.2, узел Process).
+# КУРИРОВАННЫЙ СТАРТОВЫЙ набор горно-металлургического домена Норникеля.
+# ЗАМЕНИТЬ файлами кейса — формат тот же (README_DB-стиль).
+# Колонки согласованы с CanonEntity и схемой узла Process (§3.2):
+#   canonical_id — стабильный ключ (canonical_id, §3.4)
+#   name_ru, name_en — канонические имена; en-алиасы дозаполняет load_references из глоссария
+#   aliases — синонимы через ';' ВНУТРИ ячейки (§4.4)
+#   domain — предметный домен: hydro/pyro/eco/waste (§3.2, справочник тегов taxonomy.csv)
+canonical_id,name_ru,name_en,aliases,domain
+electrowinning,электроэкстракция,electrowinning,электровыделение;электролитическое выделение;EW,hydro
+electrorefining,электрорафинирование,electrorefining,электролитическое рафинирование,hydro
+electrolysis,электролиз,electrolysis,электролитическое разделение,hydro
+heap_leaching,кучное выщелачивание,heap leaching,кучное выщелачивание руды,hydro
+tank_leaching,чановое выщелачивание,tank leaching,агитационное выщелачивание,hydro
+pressure_leaching,автоклавное выщелачивание,pressure leaching,POX;окислительное автоклавное выщелачивание;автоклавное окисление,hydro
+atmospheric_leaching,атмосферное выщелачивание,atmospheric leaching,выщелачивание при атмосферном давлении,hydro
+chlorination,хлорирование,chlorination,хлорное выщелачивание;солянокислотное выщелачивание,hydro
+cementation,цементация,cementation,контактное осаждение,hydro
+solvent_extraction,экстракция,solvent extraction,SX;жидкостная экстракция;экстракционное разделение,hydro
+ion_exchange,ионный обмен,ion exchange,сорбция;ионообменная очистка,hydro
+precipitation,осаждение,precipitation,химическое осаждение;гидролитическое осаждение,hydro
+neutralization,нейтрализация,neutralization,известкование,hydro
+crystallization,кристаллизация,crystallization,упаривание и кристаллизация,hydro
+purification,очистка растворов,solution purification,очистка электролита;купоросная очистка,hydro
+flotation,флотация,flotation,пенная флотация;флотационное обогащение,hydro
+grinding,измельчение,grinding,помол;тонкое измельчение,hydro
+thickening,сгущение,thickening,осветление;уплотнение пульпы,hydro
+filtration,фильтрация,filtration,обезвоживание;фильтрование,hydro
+flash_smelting,взвешенная плавка,flash smelting,плавка во взвешенном состоянии;плавка на штейн,pyro
+converting,конвертирование,converting,конвертирование штейна;продувка,pyro
+slag_cleaning,обеднение шлака,slag cleaning,обеднение шлаков;электрообеднение шлака;slag depletion,pyro
+electric_smelting,электроплавка,electric smelting,руднотермическая плавка,pyro
+roasting,обжиг,roasting,окислительный обжиг;сульфатизирующий обжиг,pyro
+sintering,агломерация,sintering,спекание,pyro
+fire_refining,огневое рафинирование,fire refining,,pyro
+calcination,кальцинация,calcination,прокаливание,pyro
+carbonyl_process,карбонильный процесс,carbonyl process,карбонильное рафинирование,pyro
+desalination,обессоливание,desalination,обессоливание воды;деминерализация;опреснение,eco
+reverse_osmosis,обратный осмос,reverse osmosis,мембранное обессоливание;RO,eco
+electrodialysis,электродиализ,electrodialysis,,eco
+nanofiltration,нанофильтрация,nanofiltration,,eco
+water_treatment,водоподготовка,water treatment,очистка сточных вод;водоочистка,eco
+gas_cleaning,газоочистка,gas cleaning,очистка отходящих газов;сероулавливание,eco
+sulfur_capture,улавливание серы,sulfur capture,производство серной кислоты из SO2;утилизация SO2,eco
+deep_well_injection,закачка шахтных вод,deep well injection,закачка вод в глубокие горизонты;подземное захоронение,waste
+tailings_storage,складирование хвостов,tailings storage,захоронение хвостов,waste
+slag_disposal,складирование шлака,slag disposal,,waste
+backfill,закладка выработок,backfill,твердеющая закладка,waste
+autoclave_oxidation,автоклавное окисление,autoclave oxidation,окислительный автоклавный передел,hydro
+selective_leaching,селективное выщелачивание,selective leaching,избирательное выщелачивание,hydro
+anode_slime_processing,переработка анодных шламов,anode slime processing,переработка шламов электролиза,hydro
+matte_leaching,выщелачивание файнштейна,matte leaching,растворение файнштейна,hydro
+tailings_reprocessing,переработка хвостов,tailings reprocessing,доизвлечение из хвостов,waste
+gas_desulfurization,десульфуризация газов,flue gas desulfurization,очистка газов от серы,eco

@@ -1,0 +1,52 @@
+# parameters.csv — справочник ПАРАМЕТРОВ (ARCHITECTURE.md §3.2, узел Parameter).
+# КУРИРОВАННЫЙ СТАРТОВЫЙ набор горно-металлургического домена Норникеля.
+# ЗАМЕНИТЬ файлами кейса — формат тот же (README_DB-стиль).
+# ВАЖНО (§3.1): узел Parameter — это ТОЛЬКО ТИП параметра. Конкретное измерение живёт
+# интервалом на ребре HAS_CONDITION/PRODUCES, а не здесь.
+# Колонки согласованы с CanonEntity и схемой узла Parameter (§3.2):
+#   canonical_id — стабильный ключ (canonical_id, §3.4)
+#   name_ru, name_en — канонические имена; en-алиасы дозаполняет load_references из глоссария
+#   aliases — синонимы через ';' ВНУТРИ ячейки (§4.4)
+#   category — concentration/temperature/flow_rate/pressure/ph/economic/environment/other (§3.2)
+#   canonical_unit — каноническая единица категории (units.yaml); пусто для категориальных/environment
+canonical_id,name_ru,name_en,aliases,category,canonical_unit
+sulfate_concentration,концентрация сульфатов,sulfate concentration,содержание сульфатов,concentration,мг/л
+chloride_concentration,концентрация хлоридов,chloride concentration,содержание хлоридов,concentration,мг/л
+nickel_concentration,концентрация никеля,nickel concentration,содержание никеля;концентрация Ni,concentration,г/л
+copper_concentration,концентрация меди,copper concentration,содержание меди,concentration,г/л
+cobalt_concentration,концентрация кобальта,cobalt concentration,содержание кобальта,concentration,г/л
+calcium_concentration,концентрация кальция,calcium concentration,содержание кальция,concentration,мг/л
+magnesium_concentration,концентрация магния,magnesium concentration,содержание магния,concentration,мг/л
+sodium_concentration,концентрация натрия,sodium concentration,содержание натрия,concentration,мг/л
+acid_concentration,концентрация кислоты,acid concentration,кислотность раствора;концентрация H2SO4,concentration,г/л
+total_dissolved_solids,сухой остаток,total dissolved solids,общее солесодержание;минерализация;TDS,concentration,мг/дм³
+temperature,температура,temperature,темп;температура процесса,temperature,°C
+electrolyte_temperature,температура электролита,electrolyte temperature,температура ванны,temperature,°C
+pulp_temperature,температура пульпы,pulp temperature,,temperature,°C
+catholyte_flow_rate,скорость потока католита,catholyte flow rate,скорость циркуляции католита;скорость подачи католита,flow_rate,м³/ч
+circulation_rate,скорость циркуляции,circulation rate,расход циркуляции,flow_rate,м³/ч
+water_flow_rate,расход воды,water flow rate,производительность по воде,flow_rate,м³/ч
+gas_flow_rate,расход газа,gas flow rate,расход дутья,flow_rate,м³/ч
+ph,pH,pH,водородный показатель;кислотность,ph,pH
+redox_potential,окислительный потенциал,redox potential,ОВП;Eh,ph,мВ
+pressure,давление,pressure,рабочее давление,pressure,МПа
+oxygen_pressure,давление кислорода,oxygen pressure,парциальное давление кислорода,pressure,МПа
+autoclave_pressure,давление в автоклаве,autoclave pressure,,pressure,МПа
+current_density,плотность тока,current density,катодная плотность тока,other,А/м²
+cell_voltage,напряжение на ванне,cell voltage,напряжение электролиза,other,В
+current_efficiency,выход по току,current efficiency,,other,%
+recovery,извлечение,recovery,степень извлечения;извлечение процент;извлечение целевого металла,other,%
+grade,содержание в продукте,grade,массовая доля;чистота продукта,other,%
+matte_grade,содержание в штейне,matte grade,доля металла в штейне,other,%
+slag_loss,потери со шлаком,slag loss,содержание металла в шлаке,other,%
+throughput,производительность,throughput,пропускная способность;мощность установки,other,т/сут
+specific_energy,удельный расход энергии,specific energy consumption,энергоёмкость;удельная энергия,economic,кВт·ч/т
+reagent_consumption,расход реагентов,reagent consumption,удельный расход реагента,economic,кг/т
+capex,капитальные затраты,capital expenditure,капзатраты;CAPEX,economic,руб
+opex,эксплуатационные затраты,operating expenditure,операционные затраты;OPEX,economic,руб/т
+production_cost,себестоимость,production cost,удельная себестоимость,economic,руб/т
+cold_climate,холодный климат,cold climate,низкие температуры окружающей среды,environment,
+arctic_conditions,арктические условия,Arctic conditions,условия Арктики;Крайний Север,environment,
+permafrost,многолетняя мерзлота,permafrost,вечная мерзлота,environment,
+high_altitude,высокогорье,high altitude,,environment,
+ore_type,тип руды,ore type,вид сырья;тип сырья,environment,

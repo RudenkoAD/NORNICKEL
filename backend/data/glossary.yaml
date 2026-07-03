@@ -1,0 +1,296 @@
+# ---------------------------------------------------------------------------
+# glossary.yaml — ru/en синонимы отраслевых терминов (ARCHITECTURE.md §4.4).
+#
+# СТАРТОВЫЙ КУРИРОВАННЫЙ ГЛОССАРИЙ горно-металлургического домена Норникеля.
+# Заменить/дополнить справочником терминов кейса — формат тот же.
+#
+# Применяется КОДОМ (canonizer.py), не LLM: canonizer раскрывает каждый список
+# синонимов в алиасы одной канонической сущности. load_references.py дозаполняет
+# name_en / aliases сущностям справочников англоязычными синонимами отсюда
+# (минимум — гарантировать en-алиасы сущностям шести демо-сценариев §1).
+#
+# Структура:
+#   canonical_id:                # тот же slug, что в reference/*.csv (если сущность там есть)
+#     label: Material|Process|Equipment|Parameter   # метка узла (§3.2), опционально
+#     ru: [синоним, синоним...]  # русские написания/сокращения
+#     en: [synonym, ...]         # англоязычные (первый — предпочтительный name_en)
+#
+# canonical_id совпадает с ключом в CSV → load_references сшивает en-алиасы с узлом.
+# Если сущности нет в CSV, глоссарий всё равно даёт canonizer'у alias->canonical_id
+# группу (unresolved останется до загрузки соответствующего справочника).
+# ---------------------------------------------------------------------------
+
+# === Материалы (§1, §3.2) ===
+nickel:
+  label: Material
+  ru: [никель, ni, никеля, никелевый, никелевая руда, никелевый штейн]
+  en: [nickel, Ni]
+
+copper:
+  label: Material
+  ru: [медь, cu, меди, медный, черновая медь]
+  en: [copper, Cu, blister copper]
+
+cobalt:
+  label: Material
+  ru: [кобальт, co, кобальта, кобальтовый]
+  en: [cobalt, Co]
+
+platinum:
+  label: Material
+  ru: [платина, pt, платины, платиновый]
+  en: [platinum, Pt]
+
+palladium:
+  label: Material
+  ru: [палладий, pd, палладия]
+  en: [palladium, Pd]
+
+rhodium:
+  label: Material
+  ru: [родий, rh, родия]
+  en: [rhodium, Rh]
+
+pgm:
+  label: Material
+  ru: [мпг, металлы платиновой группы, платиноиды, платиновые металлы, эпг]
+  en: [PGM, platinum group metals, PGMs]
+
+gold:
+  label: Material
+  ru: [золото, au, золота]
+  en: [gold, Au]
+
+silver:
+  label: Material
+  ru: [серебро, ag, серебра]
+  en: [silver, Ag]
+
+matte:
+  label: Material
+  ru: [штейн, медно-никелевый штейн, штейна]
+  en: [matte, copper-nickel matte]
+
+converter_matte:
+  label: Material
+  ru: [файнштейн, файнштейна, белый штейн]
+  en: [converter matte, white metal, Bessemer matte]
+
+slag:
+  label: Material
+  ru: [шлак, шлака, отвальный шлак, конвертерный шлак]
+  en: [slag, converter slag]
+
+catholyte:
+  label: Material
+  ru: [католит, католита]
+  en: [catholyte]
+
+anolyte:
+  label: Material
+  ru: [анолит, анолита]
+  en: [anolyte]
+
+sulfuric_acid:
+  label: Material
+  ru: [серная кислота, h2so4]
+  en: [sulfuric acid, sulphuric acid]
+
+sulfates:
+  label: Material
+  ru: [сульфаты, сульфат, so4, сульфат-ион]
+  en: [sulfates, sulphates, sulfate]
+
+chlorides:
+  label: Material
+  ru: [хлориды, хлорид, cl, хлорид-ион]
+  en: [chlorides, chloride]
+
+sulfur:
+  label: Material
+  ru: [сера, серы, элементная сера, s]
+  en: [sulfur, sulphur, elemental sulfur]
+
+sulfur_dioxide:
+  label: Material
+  ru: [диоксид серы, сернистый газ, so2, сернистый ангидрид]
+  en: [sulfur dioxide, SO2]
+
+gypsum:
+  label: Material
+  ru: [гипс, гипса, дигидрат сульфата кальция]
+  en: [gypsum]
+
+nickel_sulfate:
+  label: Material
+  ru: [сульфат никеля, никель сернокислый, niso4]
+  en: [nickel sulfate, nickel sulphate]
+
+ncm_precursor:
+  label: Material
+  ru: [прекурсор ncm, ncm-прекурсор, прекурсор катодных материалов, гидроксид ncm]
+  en: [NCM precursor, nickel cobalt manganese precursor, cathode precursor]
+
+# === Процессы (§1, §3.2) ===
+electrowinning:
+  label: Process
+  ru: [электроэкстракция, электровыделение, электролитическое выделение]
+  en: [electrowinning, electro-winning, EW]
+
+electrorefining:
+  label: Process
+  ru: [электрорафинирование, электролитическое рафинирование]
+  en: [electrorefining, electro-refining]
+
+heap_leaching:
+  label: Process
+  ru: [кучное выщелачивание, кучное выщелачивание руды]
+  en: [heap leaching]
+
+pressure_leaching:
+  label: Process
+  ru: [автоклавное выщелачивание, окислительное автоклавное выщелачивание, poks]
+  en: [pressure leaching, autoclave leaching, POX, pressure oxidation]
+
+flotation:
+  label: Process
+  ru: [флотация, пенная флотация, флотационное обогащение]
+  en: [flotation, froth flotation]
+
+slag_cleaning:
+  label: Process
+  ru: [обеднение шлака, обеднение шлаков, электрообеднение шлака]
+  en: [slag cleaning, slag depletion, slag reduction]
+
+flash_smelting:
+  label: Process
+  ru: [взвешенная плавка, плавка во взвешенном состоянии, плавка на штейн]
+  en: [flash smelting]
+
+converting:
+  label: Process
+  ru: [конвертирование, конвертирование штейна, продувка]
+  en: [converting]
+
+chlorination:
+  label: Process
+  ru: [хлорирование, хлорное выщелачивание, солянокислотное выщелачивание]
+  en: [chlorination, chloride leaching]
+
+desalination:
+  label: Process
+  ru: [обессоливание, обессоливание воды, деминерализация, опреснение]
+  en: [desalination, demineralization]
+
+deep_well_injection:
+  label: Process
+  ru: [закачка шахтных вод, закачка вод в глубокие горизонты, подземное захоронение]
+  en: [deep well injection, deep-well injection]
+
+roasting:
+  label: Process
+  ru: [обжиг, окислительный обжиг, сульфатизирующий обжиг]
+  en: [roasting]
+
+solvent_extraction:
+  label: Process
+  ru: [экстракция, жидкостная экстракция, экстракционное разделение, sx]
+  en: [solvent extraction, SX]
+
+# === Оборудование (§3.2) ===
+flash_furnace:
+  label: Equipment
+  ru: [печь взвешенной плавки, пвп, печь вп]
+  en: [flash smelting furnace, flash furnace]
+
+tube_furnace:
+  label: Equipment
+  ru: [трубчатая печь, трубчатая вращающаяся печь]
+  en: [tube furnace, rotary tube furnace]
+
+electrolysis_cell:
+  label: Equipment
+  ru: [ванна электролиза, электролизная ванна, электролизёр]
+  en: [electrolysis cell, electrolytic cell]
+
+diaphragm_cell:
+  label: Equipment
+  ru: [диафрагменная ячейка, диафрагменный электролизёр]
+  en: [diaphragm cell]
+
+autoclave:
+  label: Equipment
+  ru: [автоклав, автоклавный реактор]
+  en: [autoclave]
+
+flotation_machine:
+  label: Equipment
+  ru: [флотомашина, флотационная машина]
+  en: [flotation machine, flotation cell]
+
+thickener:
+  label: Equipment
+  ru: [сгуститель, радиальный сгуститель]
+  en: [thickener]
+
+converter:
+  label: Equipment
+  ru: [конвертер, горизонтальный конвертер, конвертер пирса-смита]
+  en: [converter, Peirce-Smith converter]
+
+# === Параметры (§3.2) ===
+sulfate_concentration:
+  label: Parameter
+  ru: [концентрация сульфатов, содержание сульфатов]
+  en: [sulfate concentration]
+
+chloride_concentration:
+  label: Parameter
+  ru: [концентрация хлоридов, содержание хлоридов]
+  en: [chloride concentration]
+
+nickel_concentration:
+  label: Parameter
+  ru: [концентрация никеля, содержание никеля]
+  en: [nickel concentration]
+
+temperature:
+  label: Parameter
+  ru: [температура, темп]
+  en: [temperature]
+
+catholyte_flow_rate:
+  label: Parameter
+  ru: [скорость потока католита, скорость циркуляции католита, скорость подачи католита]
+  en: [catholyte flow rate, catholyte circulation rate]
+
+ph:
+  label: Parameter
+  ru: [ph, водородный показатель, кислотность]
+  en: [pH]
+
+pressure:
+  label: Parameter
+  ru: [давление]
+  en: [pressure]
+
+current_density:
+  label: Parameter
+  ru: [плотность тока, катодная плотность тока]
+  en: [current density]
+
+recovery:
+  label: Parameter
+  ru: [извлечение, степень извлечения, извлечение процент]
+  en: [recovery, extraction rate]
+
+# === Условия среды (§3.2, category:environment) ===
+cold_climate:
+  label: Parameter
+  ru: [холодный климат, низкие температуры окружающей среды]
+  en: [cold climate]
+
+arctic_conditions:
+  label: Parameter
+  ru: [арктические условия, условия арктики, крайний север]
+  en: [Arctic conditions]

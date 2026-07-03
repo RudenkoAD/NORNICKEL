@@ -1,0 +1,23 @@
+# taxonomy.csv — ТАКСОНОМИЯ доменных тегов (ARCHITECTURE.md §3.2, §5.2 find_gaps).
+# КУРИРОВАННЫЙ СТАРТОВЫЙ набор. ЗАМЕНИТЬ таксономией кейса — формат тот же.
+# Это НЕ узлы-сущности: домены проставляются свойством Process.domain (§3.2), а
+# env-теги используются как value_text env-условий (§3.2, category:environment) и как оси
+# декартова произведения find_gaps (§5.2). canonizer их как сущности НЕ грузит.
+# Колонки:
+#   tag_id — стабильный идентификатор тега
+#   kind — вид: domain (домен процесса) | environment (условие среды) | material_class
+#   name_ru, name_en — имена; aliases — синонимы через ';' (§4.4)
+tag_id,kind,name_ru,name_en,aliases
+hydro,domain,гидрометаллургия,hydrometallurgy,гидрометаллургический;мокрые процессы
+pyro,domain,пирометаллургия,pyrometallurgy,пирометаллургический;огневые процессы
+eco,domain,экология и водоочистка,ecology,экологический;природоохранный;водоочистка
+waste,domain,обращение с отходами,waste management,отходы;захоронение;утилизация
+electro,domain,электрометаллургия,electrometallurgy,электрохимия;электролизные процессы
+cold_climate,environment,холодный климат,cold climate,низкие температуры;отрицательные температуры
+arctic_conditions,environment,арктические условия,Arctic conditions,Арктика;Крайний Север
+permafrost,environment,многолетняя мерзлота,permafrost,вечная мерзлота
+temperate,environment,умеренный климат,temperate climate,
+sulfide_ore,material_class,сульфидная руда,sulfide ore,сульфидное сырьё
+oxide_ore,material_class,окисленная руда,oxide ore,окисленное сырьё;латерит
+solution,material_class,раствор,solution,технологический раствор;пульпа
+gas,material_class,газ,gas,отходящие газы;технологический газ
