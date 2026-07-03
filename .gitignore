@@ -1,2 +1,15 @@
 /.claude
 corpus
+
+# Секреты и локальные окружения
+.env
+.venv/
+backend/.venv/
+
+# Полные тексты документов (§3.2: full_text лежит файлом, не в git)
+backend/data/texts/
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
