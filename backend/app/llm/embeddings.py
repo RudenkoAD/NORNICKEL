@@ -76,11 +76,14 @@ class _TooLong(Exception):
 _GLOBAL_EMB_SEMAPHORE: Optional[asyncio.Semaphore] = None
 _GLOBAL_EMB_LIMIT = 3  # 04.07: 6 не хватило — журнал (40 чанков) выбивал квоту
 
-# 429 — не отказ сервиса, а сигнал «притормози». 04.07: паузы удлинены до 40с —
-# у выпуска журнала 40 эмбеддингов встают в очередь одновременно, и короткие паузы
-# истекали раньше, чем квота освобождалась. Онлайн-запрос (§5.2) делает 1-2 вызова
-# и до длинных пауз не доходит.
-_RATE_LIMIT_SLEEPS = (2.0, 5.0, 10.0, 20.0, 40.0)
+# 429 — не отказ сервиса, а сигнал «притормози». Два профиля (04.07, замер квоты:
+# «медленнее — хуже» → лимит оконный/часовой, секундами не пережидается):
+# - ОНЛАЙН (embed_query, живой /query): короткие паузы — fail fast для жюри;
+# - ОФЛАЙН (embed_doc/embed_docs, ingest): терпеливый профиль до ~2 мин паузы,
+#   суммарно ~11 мин ожидания — сторож экстракции масштабируется, документ
+#   в итоге либо пройдёт, либо честно упадёт с понятной причиной.
+_RATE_LIMIT_SLEEPS_ONLINE = (2.0, 5.0, 10.0)
+_RATE_LIMIT_SLEEPS_PATIENT = (5.0, 10.0, 20.0, 40.0, 60.0, 90.0, 120.0, 120.0, 120.0, 120.0, 120.0)
 
 # Глобальный минимальный интервал между СТАРТАМИ запросов (token-bucket на процесс):
 # защищает квоту RPS независимо от степени параллельности вызывающих.
@@ -109,7 +112,8 @@ def _emb_semaphore() -> asyncio.Semaphore:
     return _GLOBAL_EMB_SEMAPHORE
 
 
-async def _embed(text: str, model_type: str, client: Optional[httpx.AsyncClient] = None) -> list[float]:
+async def _embed(text: str, model_type: str, client: Optional[httpx.AsyncClient] = None,
+                 patient: bool = False) -> list[float]:
     """Один запрос эмбеддинга. Таймаут + 1 ретрай (сеть) / до 3 пауз (429),
     затем LLMError (инвариант №9).
 
@@ -150,7 +154,7 @@ async def _embed(text: str, model_type: str, client: Optional[httpx.AsyncClient]
         return vec
 
     last_err: Optional[Exception] = None
-    rate_sleeps = list(_RATE_LIMIT_SLEEPS)
+    rate_sleeps = list(_RATE_LIMIT_SLEEPS_PATIENT if patient else _RATE_LIMIT_SLEEPS_ONLINE)
     attempt = 0
     while attempt < 2:  # исходная попытка + ОДИН ретрай (сетевые/серверные ошибки)
         try:
@@ -164,7 +168,10 @@ async def _embed(text: str, model_type: str, client: Optional[httpx.AsyncClient]
                 log.warning("embed(%s): 429 rate limit — пауза %.0f c.", model_type, pause)
                 await asyncio.sleep(pause)
                 continue  # 429-паузы НЕ тратят обычный ретрай-бюджет
-            last_err = LLMError("429 rate limit после трёх пауз")
+            last_err = LLMError(
+                f"429 rate limit: бюджет пауз исчерпан "
+                f"({'терпеливый' if patient else 'онлайн'} профиль)"
+            )
             break
         except _TooLong:
             emb_text = emb_text[: len(emb_text) // 2]
@@ -194,8 +201,8 @@ def _assert_dim(vec: list[float], settings: Settings) -> None:
 
 
 async def embed_doc(text: str) -> list[float]:
-    """Вектор документа/чанка (модель text-search-doc). LLMError при ошибке (§9)."""
-    return await _embed(text, MODEL_DOC)
+    """Вектор документа/чанка (text-search-doc), ОФЛАЙН-профиль 429 (§4). LLMError при ошибке."""
+    return await _embed(text, MODEL_DOC, patient=True)
 
 
 async def embed_query(text: str) -> list[float]:
@@ -219,6 +226,7 @@ async def embed_docs(texts: list[str], max_concurrency: int = 8) -> list[list[fl
     async with httpx.AsyncClient(timeout=timeout) as client:
         async def _one(t: str) -> list[float]:
             async with semaphore:
-                return await _embed(t, MODEL_DOC, client=client)
+                # patient=True: пакетная векторизация — офлайн-профиль 429 (§4).
+                return await _embed(t, MODEL_DOC, client=client, patient=True)
 
         return await asyncio.gather(*(_one(t) for t in texts))
