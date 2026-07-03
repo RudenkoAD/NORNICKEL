@@ -56,19 +56,67 @@ def _headers(settings: Settings) -> dict[str, str]:
     }
 
 
+# Лимит входа textEmbedding — 2048 токенов; кириллица ~3 символа/токен. Чанк §4
+# (3500 токенов извлечения) в лимит не влезает → 400 Bad Request. Усечение до
+# ~1700 токенов с запасом: голова чанка репрезентативна для семантического поиска,
+# а полный текст остаётся в Chunk.text для цитирования.
+EMB_MAX_CHARS = 5000
+
+
+class _RateLimited(Exception):
+    """Внутренний маркер 429 — обрабатывается паузами, не тратит ретрай-бюджет."""
+
+
+class _TooLong(Exception):
+    """Внутренний маркер 400-на-длинном-тексте — лечится половинным усечением."""
+
+
+# Глобальный колпак параллельных эмбеддинг-вызовов НА ПРОЦЕСС (03.07): конкурентность
+# по документам (4) × embed_docs (8) давала до 32 одновременных запросов → 429.
+_GLOBAL_EMB_SEMAPHORE: Optional[asyncio.Semaphore] = None
+_GLOBAL_EMB_LIMIT = 6
+
+# 429 — не отказ сервиса, а сигнал «притормози»: до 3 повторов с паузами.
+# Суммарно ~17 c худшего случая — для офлайн-импорта нормально, онлайн-запрос
+# делает 1-2 эмбеддинга и в 429 практически не попадает (§5.2).
+_RATE_LIMIT_SLEEPS = (2.0, 5.0, 10.0)
+
+
+def _emb_semaphore() -> asyncio.Semaphore:
+    global _GLOBAL_EMB_SEMAPHORE
+    if _GLOBAL_EMB_SEMAPHORE is None:
+        _GLOBAL_EMB_SEMAPHORE = asyncio.Semaphore(_GLOBAL_EMB_LIMIT)
+    return _GLOBAL_EMB_SEMAPHORE
+
+
 async def _embed(text: str, model_type: str, client: Optional[httpx.AsyncClient] = None) -> list[float]:
-    """Один запрос эмбеддинга. Таймаут + 1 ретрай, затем LLMError (инвариант №9).
+    """Один запрос эмбеддинга. Таймаут + 1 ретрай (сеть) / до 3 пауз (429),
+    затем LLMError (инвариант №9).
 
     `client` можно переиспользовать (батч в embed_docs открывает один AsyncClient на все
     задачи), иначе создаётся временный.
     """
+    if not (text or "").strip():
+        # 400 Bad Request от Yandex на пустой строке (03.07, Доклад_Румянцев):
+        # падаем сразу с понятной причиной — ретраи бессмысленны.
+        raise LLMError("Пустой текст для эмбеддинга (документ без summary или пустой чанк).")
+
     settings = _settings()
-    payload = {"modelUri": _model_uri(model_type, settings), "text": text}
     headers = _headers(settings)
     timeout = float(settings.llm_timeout_s)
+    # Адаптивное усечение (03.07, Румянцев/Трофимов): лимит API — 2048 ТОКЕНОВ, а не
+    # символов. Для плотного текста (формулы, цифры) 5000 симв. > лимита → 400.
+    # На 400 повторяем с половинной длиной (до 2 раз) — токенизатор нам недоступен.
+    emb_text = text[:EMB_MAX_CHARS]
 
     async def _do(cl: httpx.AsyncClient) -> list[float]:
-        resp = await cl.post(YANDEX_EMBEDDING_URL, headers=headers, json=payload)
+        payload = {"modelUri": _model_uri(model_type, settings), "text": emb_text}
+        async with _emb_semaphore():
+            resp = await cl.post(YANDEX_EMBEDDING_URL, headers=headers, json=payload)
+        if resp.status_code == 429:
+            raise _RateLimited()
+        if resp.status_code == 400 and len(emb_text) > 1000:
+            raise _TooLong()
         resp.raise_for_status()
         data = resp.json()
         vec_raw = data.get("embedding")
@@ -81,12 +129,27 @@ async def _embed(text: str, model_type: str, client: Optional[httpx.AsyncClient]
         return vec
 
     last_err: Optional[Exception] = None
-    for attempt in range(2):  # исходная попытка + ОДИН ретрай
+    rate_sleeps = list(_RATE_LIMIT_SLEEPS)
+    attempt = 0
+    while attempt < 2:  # исходная попытка + ОДИН ретрай (сетевые/серверные ошибки)
         try:
             if client is not None:
                 return await _do(client)
             async with httpx.AsyncClient(timeout=timeout) as cl:
                 return await _do(cl)
+        except _RateLimited:
+            if rate_sleeps:
+                pause = rate_sleeps.pop(0)
+                log.warning("embed(%s): 429 rate limit — пауза %.0f c.", model_type, pause)
+                await asyncio.sleep(pause)
+                continue  # 429-паузы НЕ тратят обычный ретрай-бюджет
+            last_err = LLMError("429 rate limit после трёх пауз")
+            break
+        except _TooLong:
+            emb_text = emb_text[: len(emb_text) // 2]
+            log.warning("embed(%s): 400 на длинном тексте — усечение до %d симв.",
+                        model_type, len(emb_text))
+            continue  # усечения НЕ тратят ретрай-бюджет (максимум ~3 деления до 1000)
         except LLMError:
             # Несовпадение размерности (инвариант №7) / отсутствие ключа/folder —
             # конфигурационная ошибка, ретрай не поможет: пробрасываем сразу.
@@ -95,6 +158,8 @@ async def _embed(text: str, model_type: str, client: Optional[httpx.AsyncClient]
             last_err = err
             if attempt == 0:
                 log.warning("embed(%s): попытка %d не удалась (%s), ретрай.", model_type, attempt + 1, err)
+            attempt += 1
+            continue
     raise LLMError(f"Эмбеддинг ({model_type}) недоступен после ретрая: {last_err}") from last_err
 
 

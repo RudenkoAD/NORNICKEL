@@ -114,6 +114,93 @@ _HAS_CYR_RE = re.compile(r"[а-яё]")
 _HAS_LAT_RE = re.compile(r"[a-z]")
 
 
+# --- Лемматизация имён сущностей (§4.4, запрос команды 03.07) -------------------- #
+# «катодного никеля» → «катодный никель»: LLM извлекает имена в падеже из текста,
+# справочники — в именительном единственном. Без приведения формы плодятся
+# unresolved-дубли и падает попадание в словарь.
+#
+# Правило НАМЕРЕННО консервативное: склоняем ТОЛЬКО главное существительное
+# (первое NOUN фразы) и согласованные с ним прилагательные/причастия ПЕРЕД ним.
+# Всё после главного существительного — не трогаем: родительные дополнения
+# («электроэкстракция никеля», «масса шлака») — правильная каноническая форма.
+_MORPH = None  # ленивый синглтон MorphAnalyzer (~1с инициализация)
+
+_TOKEN_KEEP_RE = re.compile(r"[0-9a-z\-–—/().,%]", re.IGNORECASE)
+
+
+def _morph():
+    global _MORPH
+    if _MORPH is None:
+        import pymorphy3
+
+        _MORPH = pymorphy3.MorphAnalyzer()
+    return _MORPH
+
+
+def _is_acronym(token: str) -> bool:
+    """КПП, МПГ, ДМ, ОВП, КМСП… — не лемматизируем (pymorphy их коверкает)."""
+    return token.isupper() and 2 <= len(token) <= 6
+
+
+def _lemmatize_phrase(name: str) -> str:
+    """Главное существительное → им.п. ед.ч., прилагательные перед ним — согласуются.
+
+    Токены с цифрами/латиницей/дефисами/пунктуацией и аббревиатуры не трогаем.
+    Нет существительного или морфология не справилась — возвращаем вход как есть.
+    """
+    tokens = name.split()
+    if not tokens or len(tokens) > 6:
+        return name
+
+    morph = _morph()
+
+    def best_parse(token: str):
+        """Лучший (по score) разбор без фамильных/именных вариантов.
+
+        Берём именно ЛУЧШИЙ, а не «первый подходящей части речи»: у причастий типа
+        «драгметаллсодержащих» бывает маловероятный предсказанный NOUN-разбор,
+        который иначе перехватывает роль головы; а «промпродуктов» без фильтра
+        Surn разбирается как фамилия «Промпродуктов» в им.п.
+        """
+        if _is_acronym(token) or _TOKEN_KEEP_RE.search(token) or not _HAS_CYR_RE.search(token.lower()):
+            return None
+        for p in morph.parse(token):
+            if not any(g in p.tag for g in ("Surn", "Name", "Patr")):
+                return p
+        return None
+
+    # Голова = первый токен, чей лучший разбор — существительное.
+    head_i, head_p = None, None
+    for i, tok in enumerate(tokens):
+        p = best_parse(tok)
+        if p is not None and p.tag.POS == "NOUN":
+            head_i, head_p = i, p
+            break
+    if head_p is None:
+        return name
+
+    target = {"nomn"} if "Pltm" in head_p.tag else {"nomn", "sing"}
+    head_form = head_p.inflect(frozenset(target))
+    if head_form is None:
+        return name
+
+    out = list(tokens)
+    out[head_i] = head_form.word
+    gender = head_p.tag.gender
+
+    # Прилагательные/причастия ПЕРЕД головой согласуем (падеж/число/род).
+    for i in range(head_i):
+        adj = best_parse(tokens[i])
+        if adj is None or adj.tag.POS not in ("ADJF", "PRTF"):
+            continue
+        grams = {"nomn", "sing"} | ({gender} if gender else set())
+        form = adj.inflect(frozenset(grams)) or adj.inflect(frozenset({"nomn", "sing"}))
+        if form is not None:
+            out[i] = form.word
+
+    return " ".join(out)
+
+
 class Canonizer:
     """Резолвер имён в canonical_id по справочникам кейса + глоссарию (§4.4)."""
 
@@ -169,6 +256,15 @@ class Canonizer:
         return text
 
     @staticmethod
+    def lemmatize(name: str) -> str:
+        """Приведение к канонической форме: главное существительное → им.п. ед.ч. (§4.4).
+
+        «катодного никеля» → «катодный никель»; «электроэкстракция никеля» — без
+        изменений (родительное дополнение после головы не трогаем).
+        """
+        return _lemmatize_phrase(str(name or "").strip())
+
+    @staticmethod
     def slug(name: str) -> str:
         """canonical_id для промаха (§4.4): транслит в латиницу + [a-z0-9-].
 
@@ -205,8 +301,11 @@ class Canonizer:
         #   (порог score); нашли — маппим и дозаписываем alias. Пока client=None → slug.
         self._fulltext_fallback(name, label)
 
+        # Каноническая форма заглушки — лемма («катодного никеля» → «катодный никель»):
+        # разные падежи одного термина сходятся в один узел, исходное имя — в aliases.
+        lemma = self.lemmatize(name)
         norm = self.normalize(name)
-        cid = self.slug(name)
+        cid = self.slug(lemma)
         key = (label, cid)
         existing = self._by_id.get(key)
         if existing is not None:
@@ -215,13 +314,14 @@ class Canonizer:
             self._register_alias(label, norm, existing)
             return existing
 
+        aliases = [lemma] if lemma == name else [lemma, name]
         entity = CanonEntity(
             canonical_id=cid,
             label=label,
-            name_ru=name if _HAS_CYR_RE.search(norm) else None,
-            name_en=name if not _HAS_CYR_RE.search(norm) else None,
-            aliases=[name],
-            aliases_text=name,
+            name_ru=lemma if _HAS_CYR_RE.search(norm) else None,
+            name_en=lemma if not _HAS_CYR_RE.search(norm) else None,
+            aliases=aliases,
+            aliases_text=" ".join(aliases),
             unresolved=True,
             extra={},
         )
@@ -247,6 +347,12 @@ class Canonizer:
         hit = self._index.get((label, norm))
         if hit is not None:
             return hit
+        # Лемма («никеля» → «никель»): справочники в им.п. ед.ч., текст — в падежах.
+        lemma_norm = self.normalize(self.lemmatize(name))
+        if lemma_norm != norm:
+            hit = self._index.get((label, lemma_norm))
+            if hit is not None:
+                return hit
         # Транслит-вариант однословного термина (Ni↔Ни): пробуем оба направления.
         for variant in _translit_variants(norm):
             hit = self._index.get((label, variant))

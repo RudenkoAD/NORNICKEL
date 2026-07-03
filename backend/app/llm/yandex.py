@@ -16,6 +16,7 @@ Fail fast (инвариант №9): таймаут `settings.llm_timeout_s`, р
 from __future__ import annotations
 
 import json
+import asyncio
 import logging
 from typing import Any, Optional
 
@@ -46,7 +47,10 @@ class YandexLLM:
     """
 
     def __init__(
-        self, settings: Optional[Settings] = None, timeout_s: Optional[float] = None
+        self,
+        settings: Optional[Settings] = None,
+        timeout_s: Optional[float] = None,
+        default_model: Optional[str] = None,
     ) -> None:
         self._s = settings or get_settings()
         if not self._s.yc_api_key:
@@ -59,6 +63,10 @@ class YandexLLM:
         # timeout_s: сильная модель-экстрактор (qwen3-235b) отвечает 30-40 c, и
         # 15-секундный таймаут рвал КАЖДЫЙ чанк (ReadTimeout с пустым текстом).
         self._timeout = float(timeout_s) if timeout_s else float(self._s.llm_timeout_s)
+        # Приоритет модели: аргумент вызова → default_model инстанса → YC_MODEL_EXTRACT.
+        # default_model нужен второму проходу (§двухпроходная схема: ingest_corpus
+        # --model qwen3-235b… пере-извлекает «плохие» документы сильной моделью).
+        self._default_model = default_model
 
     # --- служебное ---
     def _headers(self) -> dict[str, str]:
@@ -70,7 +78,7 @@ class YandexLLM:
         }
 
     def _resolve_model(self, model: Optional[str]) -> str:
-        chosen = model or self._s.yc_model_extract
+        chosen = model or self._default_model or self._s.yc_model_extract
         if not chosen:
             raise LLMError(
                 "Модель LLM не задана: передайте model=gpt://<folder>/<model>/<ver> "
@@ -90,15 +98,25 @@ class YandexLLM:
         return chosen
 
     async def _post_chat(self, payload: dict[str, Any]) -> dict[str, Any]:
-        """Один POST /chat/completions. Бросает httpx-ошибку/LLMError — ретрай снаружи."""
+        """Один POST /chat/completions с 429-backoff. Прочие ошибки — ретрай снаружи.
+
+        429 — не отказ, а «притормози» (04.07: чанк-батчинг поднимает параллельность
+        до ~16 chat-вызовов): до трёх пауз 2/5/10 c, НЕ тратя обычный ретрай-бюджет.
+        """
         async with httpx.AsyncClient(timeout=self._timeout) as client:
-            resp = await client.post(
-                f"{self._base_url}/chat/completions",
-                headers=self._headers(),
-                json=payload,
-            )
-            resp.raise_for_status()
-            return resp.json()
+            for pause in (2.0, 5.0, 10.0, None):
+                resp = await client.post(
+                    f"{self._base_url}/chat/completions",
+                    headers=self._headers(),
+                    json=payload,
+                )
+                if resp.status_code == 429 and pause is not None:
+                    log.warning("chat: 429 rate limit — пауза %.0f c.", pause)
+                    await asyncio.sleep(pause)
+                    continue
+                resp.raise_for_status()
+                return resp.json()
+            raise LLMError("chat: 429 rate limit после трёх пауз")  # недостижимо без 429
 
     @staticmethod
     def _extract_content(data: dict[str, Any]) -> str:

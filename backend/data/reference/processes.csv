@@ -52,3 +52,24 @@ anode_slime_processing,переработка анодных шламов,anode 
 matte_leaching,выщелачивание файнштейна,matte leaching,растворение файнштейна,hydro
 tailings_reprocessing,переработка хвостов,tailings reprocessing,доизвлечение из хвостов,waste
 gas_desulfurization,десульфуризация газов,flue gas desulfurization,очистка газов от серы,eco
+# --- Пополнение 03.07-3 (консолидация по живому графу): частые процессы пиро-передела,
+# --- обеднения шлака и аффинажа, отсутствовавшие в стартовом справочнике.
+smelting,плавка,smelting,штейновая плавка,pyro
+oxidative_smelting,окислительная плавка,oxidative smelting,окислительная плавка медно-никелевого концентрата,pyro
+reduction_smelting,восстановительная плавка,reduction smelting,восстановительное плавление;reduction melting;восстановительная плавка в печи Ванюкова;восстановительное плавление в печи Ванюкова,pyro
+oxide_reduction,восстановление оксидов,oxide reduction,восстановление;восстановление оксидов металлов;восстановление металлов из оксидов,pyro
+depletion,обеднение,depletion,обеднение шлака электропечью,pyro
+magnetic_separation,магнитная сепарация,magnetic separation,магнитное обогащение,hydro
+leaching,выщелачивание,leaching,выщелачивания,hydro
+sulfation,сульфатизация,sulfation,сульфатизирующий обжиг;сульфатизирующая обработка,pyro
+hydrochlorination,гидрохлорирование,hydrochlorination,гидрохлоридное выщелачивание,hydro
+precious_metal_refining,аффинаж,precious metal refining,аффинажный передел;рафинирование драгоценных металлов,hydro
+copper_refining,рафинирование меди,copper refining,,hydro
+nickel_cobalt_refining,рафинирование никеля и кобальта,nickel and cobalt refining,,hydro
+collective_flotation,коллективная флотация,collective flotation,коллективное флотационное обогащение,hydro
+selective_flotation,селективная флотация,selective flotation,селективное флотационное разделение,hydro
+gravity_flotation,гравитационно-флотационная схема,gravity-flotation scheme,гравитационно‑флотационная схема,hydro
+coalescence,коалесценция,coalescence,коалесценция сульфидов;коалесценция металлических частиц,pyro
+thermodynamic_modeling,термодинамическое моделирование,thermodynamic modeling,термодинамический расчёт;термодинамический расчет,pyro
+so2_utilization,утилизация диоксида серы,SO2 utilization,утилизация SO2,eco
+drill_and_blast,буровзрывные работы,drill and blasting,буровзрывная работа;БВР,waste

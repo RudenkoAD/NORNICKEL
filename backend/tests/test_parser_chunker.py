@@ -248,3 +248,63 @@ def test_invalid_overrides_fall_back_to_computed() -> None:
     )
     assert trust == "high"  # из doc_type
     assert access == "internal"  # из пути
+
+
+# --- Header-aware линеаризация таблиц (03.07: «quote не найдена» на табличных фактах) ---
+
+from app.ingest.parser import linearize_table  # noqa: E402
+
+
+def test_linearize_with_label_column():
+    """Кейс статьи №17: пустая шапка над колонкой меток → «метка: колонка = значение»."""
+    rows = [
+        ["", "Cu+Ni", "Pd", "SiO2/Pd"],
+        ["Низкокремнистый", "3,14-7,24", "16,0-26,1", "0,40-0,58"],
+        ["Высококремнистый", "3,24-8,55", "14,0-21,6", "0,60-0,84"],
+    ]
+    out = linearize_table(rows)
+    # Пара «колонка = значение» теперь непрерывна — цитируема и валидируема.
+    assert "Низкокремнистый: Cu+Ni = 3,14-7,24; Pd = 16,0-26,1; SiO2/Pd = 0,40-0,58." in out
+    assert "Высококремнистый: Cu+Ni = 3,24-8,55" in out
+
+
+def test_linearize_without_label_column():
+    rows = [["Параметр", "Значение"], ["Температура", "1300"]]
+    out = linearize_table(rows)
+    assert "Параметр = Температура; Значение = 1300." in out
+
+
+def test_linearize_single_row_and_empty():
+    assert linearize_table([["a", "b"]]) == "a | b"
+    assert linearize_table([["", ""]]) == ""
+
+
+def test_linearize_two_row_merged_header():
+    """Кейс статьи №17: merged-шапка «Содержание…% масс.»×3 + подстрока Cu/Ni/Fe."""
+    rows = [
+        ["№ опыта", "Температура, оС", "Содержание в сплаве, % масс.",
+         "Содержание в сплаве, % масс.", "Содержание в сплаве, % масс."],
+        ["№ опыта", "Температура, оС", "Cu", "Ni", "Fe"],
+        ["1", "1300", "9,32", "54,1", "31,2"],
+    ]
+    out = linearize_table(rows)
+    assert "№ опыта = 1" in out
+    assert "Температура, оС = 1300" in out
+    assert "Содержание в сплаве, % масс., Cu = 9,32" in out
+    assert "Содержание в сплаве, % масс., Ni = 54,1" in out
+    assert "= № опыта" not in out  # вторая строка шапки не стала «данными»
+
+
+def test_processed_output_path_mirrors_corpus():
+    """04.07: corpus/<...>/x.docx → processed_corpus/<...>/x.md с той же вложенностью."""
+    from app.ingest.parser import processed_output_path
+    from pathlib import Path
+
+    src = Path("/tmp/proj/corpus/Статьи/подпапка/статья.docx")
+    # parents строятся от строки — файл существовать не обязан (resolve() на macOS/tmp
+    # может добавить /private — проверяем хвост пути).
+    out = processed_output_path(src)
+    assert out is not None
+    assert str(out).endswith("processed_corpus/Статьи/подпапка/статья.md")
+
+    assert processed_output_path(Path("/tmp/вне/файл.docx")) is None

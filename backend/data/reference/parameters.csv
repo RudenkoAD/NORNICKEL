@@ -50,3 +50,40 @@ arctic_conditions,арктические условия,Arctic conditions,усл
 permafrost,многолетняя мерзлота,permafrost,вечная мерзлота,environment,
 high_altitude,высокогорье,high altitude,,environment,
 ore_type,тип руды,ore type,вид сырья;тип сырья,environment,
+# --- Пополнение 03.07-3 (консолидация по живому графу): частые типы параметров.
+# --- Содержание элемента в продукте (grade, %) — флагманский паттерн кейса
+# --- «содержание Pt+Pd в концентрате >90%» (§3.3). Отличать от *_concentration (г/л)!
+nickel_grade,содержание никеля в продукте,nickel grade,содержание Ni;Ni content,other,%
+copper_grade,содержание меди в продукте,copper grade,содержание Cu;Cu content,other,%
+iron_grade,содержание железа в продукте,iron grade,содержание Fe;Fe content,other,%
+cobalt_grade,содержание кобальта в продукте,cobalt grade,содержание Co,other,%
+sulfur_grade,содержание серы в продукте,sulfur grade,содержание S;S content,other,%
+silica_grade,содержание SiO2,silica grade,содержание кремнезёма;содержание SiO2 в шлаке,other,%
+platinum_grade,содержание платины,platinum grade,содержание Pt;Pt content,other,%
+palladium_grade,содержание палладия,palladium grade,содержание Pd;Pd content,other,%
+gold_grade,содержание золота,gold grade,содержание Au,other,%
+pgm_grade,содержание МПГ,PGM grade,содержание платиновых металлов;содержание суммы ПМ;содержание Pt+Pd;содержание Pt+Pd+Au,other,%
+precious_metal_grade,содержание драгоценных металлов,precious metal grade,содержание ДМ,other,%
+base_metal_grade,содержание цветных металлов,base metal grade,концентрация цветных металлов;содержание Cu+Ni,other,%
+nickel_recovery,извлечение никеля,nickel recovery,извлечение Ni,other,%
+copper_recovery,извлечение меди,copper recovery,извлечение Cu,other,%
+cobalt_recovery,извлечение кобальта,cobalt recovery,извлечение Co,other,%
+pgm_recovery,извлечение платиновых металлов,PGM recovery,извлечение платины и палладия;извлечение Pt и Pd,other,%
+melting_temperature,температура плавления,melting temperature,температура плавления железа;температура плавления донной фазы,temperature,°C
+liquidus_temperature,температура ликвидус,liquidus temperature,температура ликвидус сплава;температура ликвидус металлической взвеси;liquidus temperature,temperature,°C
+slag_temperature,температура шлака,slag temperature,температура процесса обеднения,temperature,°C
+slag_viscosity,вязкость шлака,slag viscosity,,viscosity,Па·с
+alloy_viscosity,вязкость сплава,alloy viscosity,,viscosity,Па·с
+dynamic_viscosity,динамическая вязкость,dynamic viscosity,кинематическая вязкость,viscosity,Па·с
+slag_density,плотность шлака,slag density,,density,г/см³
+alloy_density,плотность сплава,alloy density,,density,г/см³
+holding_time,время выдержки,holding time,время выдержки расплава,time,мин
+alloy_yield,выход сплава,alloy yield,,other,%
+liquid_solid_ratio,отношение Ж:Т,liquid-to-solid ratio,Ж:Т;соотношение Ж/Т;отношение жидкое-твёрдое,other,
+chlorine_feed_rate,скорость подачи хлора,chlorine feed rate,расход хлора,flow_rate,м³/ч
+particle_size,размер частиц,particle size,крупность металлических корольков;эквивалентный радиус королька,size,мкм
+principal_stress,главное напряжение,principal stress,максимальное главное напряжение;минимальное главное напряжение;промежуточное главное напряжение,pressure,МПа
+rock_stress,напряжение в массиве,rock stress,напряжения в массиве;напряжённо-деформированное состояние;НДС,pressure,МПа
+seismic_energy,энергия сейсмособытия,seismic energy,энергия исследуемого сейсмособытия,other,Дж
+wave_velocity,скорость продольных волн,wave velocity,скорость смещения;пиковая скорость,other,м/с
+dip_angle,угол падения,dip angle,наклон скважин,other,град

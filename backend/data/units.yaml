@@ -47,6 +47,46 @@ categories:
   recovery:
     canonical_unit: "%"
     abs_delta: 1.0           # степень извлечения / выход / доля, «около 0» → ±1 %
+  time:
+    canonical_unit: "мин"
+    abs_delta: 1.0           # 03.07: время выдержки/продувки в статьях («минут», «ч»)
+  density:
+    canonical_unit: "г/см³"
+    abs_delta: 0.05          # 03.07: таблицы плотности расплавов (статья №17)
+  viscosity:
+    canonical_unit: "Па·с"
+    abs_delta: 0.001         # 03.07: кинематическая/динамическая вязкость (пуазы)
+  size:
+    canonical_unit: "мкм"
+    abs_delta: 1.0           # 03.07: размер частиц/корольков
+  mass:
+    canonical_unit: "г"
+    abs_delta: 0.1           # 03.07-2: навески в лабораторных опытах (qwen)
+  volume:
+    canonical_unit: "л"
+    abs_delta: 0.1
+  # 03.07-3 (консолидация по живому графу): категории геомеханики/сейсмики. В корпусе
+  # есть документы по буровзрывным работам и напряжённо-деформированному состоянию
+  # массива (скважины, датчики, сейсмовзрывные волны) — их числа флагались как
+  # unknown_units (алерт §4.3). Единицы физически однозначны, конвертации точны.
+  length:
+    canonical_unit: "м"
+    abs_delta: 0.01          # геометрия блоков/скважин/шагов сетки (м, см)
+  frequency:
+    canonical_unit: "Гц"
+    abs_delta: 0.1           # диапазон частот сейсмовзрывных волн
+  velocity:
+    canonical_unit: "м/с"
+    abs_delta: 0.1           # скорость продольных волн, скорость смещения (PVS)
+  angle:
+    canonical_unit: "град"
+    abs_delta: 0.5           # угол падения, наклон скважин
+  area:
+    canonical_unit: "см²"
+    abs_delta: 0.1           # требуемое армирование сечения (см²)
+  energy:
+    canonical_unit: "Дж"
+    abs_delta: 1.0           # энергия сейсмособытия (Дж)
   other:
     canonical_unit: null
     abs_delta: null
@@ -85,6 +125,14 @@ units:
   "K":        {category: temperature, multiplier: 1.0, offset: -273.15}
   "К":        {category: temperature, multiplier: 1.0, offset: -273.15}
   "°K":       {category: temperature, multiplier: 1.0, offset: -273.15}
+  # Пополнение 03.07 (алерт unknown_units, статьи corpus/): в русских текстах градус
+  # часто набирают кириллической «о» вместо «°», а «С» — заглавная кириллица.
+  "оС":       {category: temperature, multiplier: 1.0, offset: 0.0}   # кир.«о» + кир.«С»
+  "оC":       {category: temperature, multiplier: 1.0, offset: 0.0}   # кир.«о» + лат.«C»
+  "oС":       {category: temperature, multiplier: 1.0, offset: 0.0}   # лат.«o» + кир.«С»
+  "С":        {category: temperature, multiplier: 1.0, offset: 0.0}   # голая кир. «С» («1300 С»)
+  "гр.С":     {category: temperature, multiplier: 1.0, offset: 0.0}
+  "град.С":   {category: temperature, multiplier: 1.0, offset: 0.0}
 
   # --- Расход / скорость потока → м³/ч ---
   "м³/ч":     {category: flow_rate, multiplier: 1.0, offset: 0.0}
@@ -129,6 +177,52 @@ units:
   "t/h":      {category: mass_rate, multiplier: 24.0, offset: 0.0}
   "кг/сут":   {category: mass_rate, multiplier: 0.001, offset: 0.0}
   "т/год":    {category: mass_rate, multiplier: 0.00273973, offset: 0.0}  # /365
+  "г/мин":    {category: mass_rate, multiplier: 0.00144, offset: 0.0}  # 03.07: 1 г/мин = 1.44 кг/сут
+  "g/min":    {category: mass_rate, multiplier: 0.00144, offset: 0.0}
+  "г/ч":      {category: mass_rate, multiplier: 0.000024, offset: 0.0}
+  "кг/мин":   {category: mass_rate, multiplier: 1.44, offset: 0.0}
+
+  # --- Плотность → г/см³ (03.07, статья №17) ---
+  "г/см³":    {category: density, multiplier: 1.0, offset: 0.0}
+  "г/см3":    {category: density, multiplier: 1.0, offset: 0.0}
+  "g/cm³":    {category: density, multiplier: 1.0, offset: 0.0}
+  "g/cm3":    {category: density, multiplier: 1.0, offset: 0.0}
+  "кг/м³":    {category: density, multiplier: 0.001, offset: 0.0}
+  "кг/м3":    {category: density, multiplier: 0.001, offset: 0.0}
+
+  # --- Вязкость → Па·с (03.07: пуазы в таблицах; «П∙10-3» = значения в 10⁻³ П) ---
+  "Па·с":     {category: viscosity, multiplier: 1.0, offset: 0.0}
+  "Па*с":     {category: viscosity, multiplier: 1.0, offset: 0.0}
+  "Pa·s":     {category: viscosity, multiplier: 1.0, offset: 0.0}
+  "мПа·с":    {category: viscosity, multiplier: 0.001, offset: 0.0}
+  "П":        {category: viscosity, multiplier: 0.1, offset: 0.0}     # пуаз
+  "П∙10-3":   {category: viscosity, multiplier: 0.0001, offset: 0.0}  # 10⁻³ пуаза
+  "П·10-3":   {category: viscosity, multiplier: 0.0001, offset: 0.0}
+  "сП":       {category: viscosity, multiplier: 0.001, offset: 0.0}   # сантипуаз
+
+  # --- Размер частиц → мкм (03.07) ---
+  "мкм":      {category: size, multiplier: 1.0, offset: 0.0}
+  "µm":       {category: size, multiplier: 1.0, offset: 0.0}
+  "um":       {category: size, multiplier: 1.0, offset: 0.0}
+  "мм":       {category: size, multiplier: 1000.0, offset: 0.0}
+  "нм":       {category: size, multiplier: 0.001, offset: 0.0}
+
+  # --- Время → мин (03.07: «время выдержки 30 минут», «продувка 2 ч») ---
+  "мин":      {category: time, multiplier: 1.0, offset: 0.0}
+  "минут":    {category: time, multiplier: 1.0, offset: 0.0}
+  "минуты":   {category: time, multiplier: 1.0, offset: 0.0}
+  "минуток":  {category: time, multiplier: 1.0, offset: 0.0}
+  "min":      {category: time, multiplier: 1.0, offset: 0.0}
+  "ч":        {category: time, multiplier: 60.0, offset: 0.0}
+  "час":      {category: time, multiplier: 60.0, offset: 0.0}
+  "часа":     {category: time, multiplier: 60.0, offset: 0.0}
+  "часов":    {category: time, multiplier: 60.0, offset: 0.0}
+  "h":        {category: time, multiplier: 60.0, offset: 0.0}
+  "с":        {category: time, multiplier: 0.0166667, offset: 0.0}   # секунда; кир. «с» ≠ «С» (Цельсий)!
+  "сек":      {category: time, multiplier: 0.0166667, offset: 0.0}
+  "s":        {category: time, multiplier: 0.0166667, offset: 0.0}
+  "сут":      {category: time, multiplier: 1440.0, offset: 0.0}
+  "суток":    {category: time, multiplier: 1440.0, offset: 0.0}
 
   # --- Плотность тока → А/м² ---
   "А/м²":     {category: current_density, multiplier: 1.0, offset: 0.0}
@@ -166,3 +260,72 @@ units:
   "$/t":      {category: economic, multiplier: null, offset: 0.0}
   "USD/т":    {category: economic, multiplier: null, offset: 0.0}
   "долл/т":   {category: economic, multiplier: null, offset: 0.0}
+
+  # --- Пополнение 03.07-2 (второй проход qwen): масс.%, навески, объёмы ---
+  "% масс.":  {category: recovery, multiplier: 1.0, offset: 0.0}   # массовая доля
+  "%масс":    {category: recovery, multiplier: 1.0, offset: 0.0}
+  "масс.%":   {category: recovery, multiplier: 1.0, offset: 0.0}
+  "% об.":    {category: recovery, multiplier: 1.0, offset: 0.0}   # объёмная доля
+  "г":        {category: mass, multiplier: 1.0, offset: 0.0}
+  "кг":       {category: mass, multiplier: 1000.0, offset: 0.0}
+  "мг":       {category: mass, multiplier: 0.001, offset: 0.0}
+  "т":        {category: mass, multiplier: 1000000.0, offset: 0.0}
+  "л":        {category: volume, multiplier: 1.0, offset: 0.0}
+  "дм3":      {category: volume, multiplier: 1.0, offset: 0.0}
+  "дм³":      {category: volume, multiplier: 1.0, offset: 0.0}
+  "мл":       {category: volume, multiplier: 0.001, offset: 0.0}
+  "м3":       {category: volume, multiplier: 1000.0, offset: 0.0}
+  "м³":       {category: volume, multiplier: 1000.0, offset: 0.0}
+
+  # --- Пополнение 03.07-3 (консолидация по графу): геомеханика / сейсмика ---
+  # Единицы из документов по буровзрывным работам и НДС массива, флагавшиеся как
+  # unknown_units (§4.3, уровень 2). Конвертации точны и однозначны.
+  #
+  # Длина → м. ВНИМАНИЕ: «мм» уже занята категорией size (→мкм, размер частиц) —
+  # не переопределяем; для линейных размеров блоков/скважин достаточно «м» и «см».
+  "м":        {category: length, multiplier: 1.0, offset: 0.0}
+  "m":        {category: length, multiplier: 1.0, offset: 0.0}
+  "см":       {category: length, multiplier: 0.01, offset: 0.0}
+  "cm":       {category: length, multiplier: 0.01, offset: 0.0}
+
+  # Частота → Гц (диапазон частот сейсмовзрывных волн, собственные частоты).
+  "Гц":       {category: frequency, multiplier: 1.0, offset: 0.0}
+  "Hz":       {category: frequency, multiplier: 1.0, offset: 0.0}
+  "кГц":      {category: frequency, multiplier: 1000.0, offset: 0.0}
+  "kHz":      {category: frequency, multiplier: 1000.0, offset: 0.0}
+
+  # Скорость → м/с (скорость продольных волн ~6000 м/с; PVS в см/с).
+  "м/с":      {category: velocity, multiplier: 1.0, offset: 0.0}
+  "m/s":      {category: velocity, multiplier: 1.0, offset: 0.0}
+  "см/с":     {category: velocity, multiplier: 0.01, offset: 0.0}
+  "cm/s":     {category: velocity, multiplier: 0.01, offset: 0.0}
+  "мм/с":     {category: velocity, multiplier: 0.001, offset: 0.0}
+  "mm/s":     {category: velocity, multiplier: 0.001, offset: 0.0}
+  "км/с":     {category: velocity, multiplier: 1000.0, offset: 0.0}
+
+  # Угол → град (угол падения залежи, наклон скважин). Радиан — точный коэффициент.
+  "град":     {category: angle, multiplier: 1.0, offset: 0.0}
+  "градус":   {category: angle, multiplier: 1.0, offset: 0.0}
+  "°":        {category: angle, multiplier: 1.0, offset: 0.0}
+  "deg":      {category: angle, multiplier: 1.0, offset: 0.0}
+  "рад":      {category: angle, multiplier: 57.2957795, offset: 0.0}   # 180/π град в 1 рад
+  "rad":      {category: angle, multiplier: 57.2957795, offset: 0.0}
+
+  # Площадь → см² (требуемое армирование сечения, см²). ВНИМАНИЕ: не путать с
+  # плотностью тока А/м² и «см2»-как-площадь — здесь голая площадь.
+  "см²":      {category: area, multiplier: 1.0, offset: 0.0}
+  "см2":      {category: area, multiplier: 1.0, offset: 0.0}
+  "cm²":      {category: area, multiplier: 1.0, offset: 0.0}
+  "cm2":      {category: area, multiplier: 1.0, offset: 0.0}
+  "мм²":      {category: area, multiplier: 0.01, offset: 0.0}    # 1 мм² = 0.01 см²
+  "мм2":      {category: area, multiplier: 0.01, offset: 0.0}
+  "м²":       {category: area, multiplier: 10000.0, offset: 0.0} # 1 м² = 10000 см²
+  "m²":       {category: area, multiplier: 10000.0, offset: 0.0}
+
+  # Энергия → Дж (энергия сейсмособытия, десятки–сотни тыс. Дж).
+  "Дж":       {category: energy, multiplier: 1.0, offset: 0.0}
+  "J":        {category: energy, multiplier: 1.0, offset: 0.0}
+  "кДж":      {category: energy, multiplier: 1000.0, offset: 0.0}
+  "kJ":       {category: energy, multiplier: 1000.0, offset: 0.0}
+  "МДж":      {category: energy, multiplier: 1000000.0, offset: 0.0}
+  "MJ":       {category: energy, multiplier: 1000000.0, offset: 0.0}

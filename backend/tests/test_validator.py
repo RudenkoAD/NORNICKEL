@@ -208,3 +208,132 @@ def test_multiple_failures_accumulate_reasons(registry: UnitRegistry) -> None:
     # И quote, и единица — обе причины присутствуют.
     assert "quote" in out["review_reason"]
     assert "непонятно/что" in out["review_reason"]
+
+
+# --- §3.3: допустимые концы рёбер + подписи к рисункам (validate_endpoints) ---
+# Введены по сравнению моделей 03.07: направления рёбер путают все модели.
+
+from app.ingest.validator import is_caption_quote, validate_endpoints  # noqa: E402
+
+_ETYPES = {
+    "хлорирование": "Process",
+    "электроэкстракция никеля": "Process",
+    "никель": "Material",
+    "качество КПП": "Parameter",
+    "ТЭР": "Experiment",
+    "ЦЭН-2": "Equipment",
+}
+
+
+def test_endpoints_produces_process_to_process_flagged():
+    """Мусор из бага пользователя: PRODUCES Process→Process → needs_review."""
+    rel = {"from": "хлорирование", "type": "PRODUCES",
+           "to": "электроэкстракция никеля", "quote": "x"}
+    validate_endpoints(rel, _ETYPES)
+    assert rel["needs_review"] is True
+    assert "§3.3" in rel["review_reason"]
+
+
+def test_endpoints_valid_produces_passes():
+    rel = {"from": "хлорирование", "type": "PRODUCES", "to": "никель", "quote": "x"}
+    validate_endpoints(rel, _ETYPES)
+    assert rel["needs_review"] is False
+
+
+def test_endpoints_has_condition_inversion_auto_fixed():
+    """Инверсия HAS_CONDITION (Parameter→Process) детерминированно ПЕРЕВОРАЧИВАЕТСЯ,
+    а не флагуется: направление путают все модели (03.07), сам факт обычно верный."""
+    bad = {"from": "качество КПП", "type": "HAS_CONDITION", "to": "хлорирование", "quote": "x"}
+    validate_endpoints(bad, _ETYPES)
+    assert bad["needs_review"] is False
+    assert bad["auto_fixed"] == "direction"
+    assert bad["from"] == "хлорирование" and bad["to"] == "качество КПП"
+
+    ok = {"from": "хлорирование", "type": "HAS_CONDITION", "to": "качество КПП", "quote": "x"}
+    validate_endpoints(ok, _ETYPES)
+    assert ok["needs_review"] is False
+    assert "auto_fixed" not in ok
+
+
+def test_endpoints_studies_requires_experiment():
+    rel = {"from": "хлорирование", "type": "STUDIES", "to": "электроэкстракция никеля", "quote": "x"}
+    validate_endpoints(rel, _ETYPES)
+    assert rel["needs_review"] is True
+
+    ok = {"from": "ТЭР", "type": "STUDIES", "to": "хлорирование", "quote": "x"}
+    validate_endpoints(ok, _ETYPES)
+    assert ok["needs_review"] is False
+
+
+def test_caption_quote_detected_and_flagged():
+    """Ребро PRODUCES из подписи «Схема …» → needs_review (кейс ЦЭН-2)."""
+    assert is_caption_quote("Схема хлорного выщелачивания - электроэкстракции никеля (ЦЭН-2)")
+    assert is_caption_quote("  Рис. 3. Зависимость извлечения")
+    assert not is_caption_quote("качество КПП – не менее 51 %")
+
+    rel = {"from": "хлорирование", "type": "PRODUCES", "to": "никель",
+           "quote": "Схема хлорного выщелачивания - электроэкстракции никеля (ЦЭН-2)"}
+    validate_endpoints(rel, _ETYPES)
+    assert rel["needs_review"] is True
+    assert "подписи" in rel["review_reason"]
+
+
+def test_caption_ok_for_uses_material():
+    """Для USES_MATERIAL подпись не карается — только PRODUCES/STUDIES чувствительны."""
+    rel = {"from": "хлорирование", "type": "USES_MATERIAL", "to": "никель",
+           "quote": "Схема аппарата"}
+    validate_endpoints(rel, _ETYPES)
+    assert rel["needs_review"] is False
+
+
+def test_endpoints_unknown_entity_flagged():
+    """Конец ребра не из entities документа (фантом) → needs_review."""
+    rel = {"from": "неизвестный процесс", "type": "PRODUCES", "to": "никель", "quote": "x"}
+    validate_endpoints(rel, _ETYPES)
+    assert rel["needs_review"] is True
+
+
+def test_endpoints_material_has_condition_allowed():
+    """03.07: состав материала — HAS_CONDITION Material→Parameter разрешён
+    («вода содержит сульфаты 200-300 мг/л», «содержание Pt+Pd > 90 %»)."""
+    rel = {"from": "никель", "type": "HAS_CONDITION", "to": "качество КПП", "quote": "x"}
+    validate_endpoints(rel, _ETYPES)
+    assert rel["needs_review"] is False
+    assert "auto_fixed" not in rel
+
+
+def test_context_ambiguity_flagged_on_shared_material():
+    """03.07 «A с B 80% → C 50%; D с B 60% → C 30%»: два разных значения одного
+    параметра на общем Material → вся группа в needs_review."""
+    from app.ingest.validator import flag_context_ambiguity
+
+    etypes = {"концентрат B": "Material", "содержание": "Parameter",
+              "эксперимент №1": "Experiment", "температура": "Parameter"}
+    rels = [
+        {"from": "концентрат B", "type": "HAS_CONDITION", "to": "содержание",
+         "value_raw": "80", "quote": "q1"},
+        {"from": "концентрат B", "type": "HAS_CONDITION", "to": "содержание",
+         "value_raw": "60", "quote": "q2"},
+        # Experiment-узел с тем же параметром — НЕ трогаем (у прогона свой узел).
+        {"from": "эксперимент №1", "type": "HAS_CONDITION", "to": "температура",
+         "value_raw": "1300", "quote": "q3"},
+    ]
+    n = flag_context_ambiguity(rels, etypes)
+    assert n == 2
+    assert rels[0]["needs_review"] and rels[1]["needs_review"]
+    assert "смешение контекстов" in rels[0]["review_reason"]
+    assert not rels[2].get("needs_review")
+
+
+def test_context_ambiguity_single_value_ok():
+    """Одно значение (пусть и с двух рёбер-дублей) — не смешение."""
+    from app.ingest.validator import flag_context_ambiguity
+
+    etypes = {"вода": "Material", "сульфаты": "Parameter"}
+    rels = [
+        {"from": "вода", "type": "HAS_CONDITION", "to": "сульфаты",
+         "value_raw": "200", "quote": "q1"},
+        {"from": "вода", "type": "HAS_CONDITION", "to": "сульфаты",
+         "value_raw": "200", "quote": "q2"},
+    ]
+    assert flag_context_ambiguity(rels, etypes) == 0

@@ -234,3 +234,49 @@ def test_canon_entity_shape() -> None:
     )
     assert ent.canonical_id == "x"
     assert ent.aliases_text == "х"
+
+
+# --- Лемматизация (§4.4, запрос команды 03.07) ---
+
+def test_lemmatize_genitive_with_adjective():
+    """«катодного никеля» → «катодный никель» (голова + согласованное прилагательное)."""
+    assert Canonizer.lemmatize("катодного никеля") == "катодный никель"
+
+
+def test_lemmatize_plural_genitive():
+    assert Canonizer.lemmatize("драгметаллсодержащих промпродуктов") == "драгметаллсодержащий промпродукт"
+
+
+def test_lemmatize_keeps_genitive_complement():
+    """Родительное дополнение ПОСЛЕ головы не трогаем — это правильная форма."""
+    assert Canonizer.lemmatize("электроэкстракция никеля") == "электроэкстракция никеля"
+    assert Canonizer.lemmatize("масса шлака") == "масса шлака"
+
+
+def test_lemmatize_keeps_acronyms_and_latin():
+    assert Canonizer.lemmatize("КПП") == "КПП"
+    assert Canonizer.lemmatize("ЦЭН-2") == "ЦЭН-2"
+    assert Canonizer.lemmatize("electrowinning") == "electrowinning"
+
+
+def test_lookup_matches_dictionary_via_lemma(canon):
+    """«никеля» из текста находит справочный «никель» через лемму."""
+    hit = canon.lookup("никеля", "Material")
+    assert hit is not None
+    assert hit.unresolved is False
+
+
+def test_resolve_lemma_hits_dictionary_alias(canon):
+    """«катодного никеля» через лемму «катодный никель» попадает в алиас справочного
+    никеля — резолв в канонический узел, а не в заглушку (это и есть цель §4.4)."""
+    ent = canon.resolve("катодного никеля", "Material")
+    assert ent.unresolved is False
+    assert ent.canonical_id == "nickel"
+
+
+def test_resolve_stub_uses_lemma(canon):
+    """Промах словаря: заглушка создаётся под леммой; исходная форма — в aliases."""
+    ent = canon.resolve("отработанного катализатора", "Material")
+    assert ent.name_ru == "отработанный катализатор"
+    assert "отработанного катализатора" in ent.aliases
+    assert ent.unresolved is True

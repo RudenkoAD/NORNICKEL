@@ -68,4 +68,26 @@ cobalt_hydroxide,гидроксид кобальта,cobalt hydroxide,Co(OH)2,pr
 mine_water,шахтная вода,mine water,шахтные воды;рудничная вода,water
 process_water,технологическая вода,process water,оборотная вода,water
 brine,рассол,brine,высокоминерализованная вода,water
-tailings,хвосты,tailings,хвосты обогащения;хвостохранилище,waste
+tailings,хвосты,tailings,хвосты обогащения;хвостохранилище;отвальные хвосты,waste
+# --- Пополнение 03.07-3 (консолидация по живому графу): частые доменные материалы,
+# --- отсутствовавшие в стартовом справочнике (пиро-передел, обеднение шлака, аффинаж).
+nickel_oxide,оксид никеля,nickel oxide,NiO;оксиды никеля,oxide
+copper_oxide,оксид меди,copper oxide,CuO;Cu2O;оксиды меди,oxide
+iron_oxide,оксид железа,iron oxide,FeO;Fe2O3;Fe3O4;оксиды железа;магнетит,oxide
+copper_nickel_oxide,оксид меди и никеля,copper-nickel oxide,оксиды меди и никеля,oxide
+silica,диоксид кремния,silica,SiO2;кремнезём;оксид кремния,oxide
+carbon,углерод,carbon,C;углеродный восстановитель;кокс,nonmetal
+carbon_monoxide,монооксид углерода,carbon monoxide,CO;оксид углерода(II);угарный газ,gas
+fayalite,фаялит,fayalite,железосиликат,ore
+metal_alloy,металлический сплав,metal alloy,сплав,intermediate
+metallic_phase,металлическая фаза,metallic phase,металлические включения;металлическая взвесь;металлическое включение;metallic phase particles;metal inclusions,intermediate
+metal_bead,королёк,metal bead,корольки;металлический королёк;металлические корольки,intermediate
+iron_silicate_melt,железосиликатный расплав,iron silicate melt,силикатная основа шлака;железосиликатная основа шлака;iron silicate melt,byproduct
+copper_nickel_concentrate,медно-никелевый концентрат,copper-nickel concentrate,сульфидный медно-никелевый концентрат,concentrate
+pyrrhotite_concentrate,пирротиновый концентрат,pyrrhotite concentrate,малоникелистый пирротиновый концентрат;МНП,concentrate
+sodium_chloride,хлорид натрия,sodium chloride,NaCl;поваренная соль,salt
+sodium_hypochlorite,гипохлорит натрия,sodium hypochlorite,NaClO;гипохлорит,reagent
+sodium_chlorate,хлорат натрия,sodium chlorate,NaClO3,reagent
+insoluble_residue,нерастворимый остаток,insoluble residue,нерастворимые остатки;неразрешимый остаток,intermediate
+mn_nodules,железомарганцевые конкреции,ferromanganese nodules,железо-марганцевые конкреции;ЖМК;кобальт-марганцевые корки,ore
+deep_sea_sulfides,глубоководные полиметаллические сульфиды,deep-sea polymetallic sulfides,глубоководный полиметаллический сульфид;ГПС,ore

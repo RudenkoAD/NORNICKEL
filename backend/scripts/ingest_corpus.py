@@ -79,6 +79,46 @@ async def process_document(
 
     # [1] parser: текст + content_hash.
     parsed = parser_mod.parse_file(path)
+    if len(parsed.text.strip()) < 100:
+        # Скан без текстового слоя / пустой файл (03.07, Доклад_Румянцев → 400 на
+        # эмбеддинге пустой строки). Честный fail с понятной причиной; OCR — future work.
+        raise RuntimeError(
+            f"Документ почти без текста ({len(parsed.text.strip())} символов) — "
+            "вероятно скан без текстового слоя; пропущен (OCR в слайде «развитие»)."
+        )
+
+    # .md-зеркало распарсенного текста в processed_corpus/ (04.07): пишем ДО
+    # hash-skip — файлы появляются и для уже импортированных документов; запись
+    # детерминированная, ошибка файловой системы не валит импорт.
+    try:
+        parser_mod.write_processed_md(parsed, path)
+    except OSError as err:
+        log.warning("processed_corpus: не записан %s (%s)", path.name, err)
+
+    # doc_id ДЕТЕРМИНИРОВАН из content_hash (uuid5), а не случайный uuid4 —
+    # иначе переимпорт того же файла рождает НОВЫЙ doc_id, writer не находит старый
+    # документ по doc_id и content_hash-skip (§4.5) не срабатывает → дубликаты
+    # (нарушение инварианта №4). Стабильный ключ = идемпотентность.
+    doc_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"nornickel:doc:{parsed.content_hash}"))
+
+    # Ранний hash-skip (03.07): проверка ДО LLM-этапов. Раньше жила только в writer —
+    # повторный прогон уже импортированного документа зря жёг экстракцию и эмбеддинги
+    # (это всплыло на добивке упавших: 429-фейл документа, который уже в графе).
+    if client is not None and not force:
+        row = client.read(
+            "MATCH (d:Document {doc_id: $id}) RETURN d.title AS title LIMIT 1",
+            {"id": doc_id},
+        )
+        if row:
+            return {
+                "path": str(path), "doc_id": doc_id, "title": row[0]["title"],
+                "doc_type": None, "access_level": None, "trust_level": None,
+                "chunks_ok": 0, "chunks_failed": 0, "entities": 0, "relations": 0,
+                "claims": 0, "dropped_dangling": 0, "needs_review": 0,
+                "extraction_raw": [], "extraction": {},
+                "skipped": True, "written": False,
+                "elapsed_s": round(time.monotonic() - t0, 2),
+            }
 
     # [2] метаданные (LLM по первым ~2 стр.) + ДЕТЕРМИНИРОВАННЫЕ trust/access (§4 шаг 2).
     meta = await metadata_mod.extract_metadata(
@@ -87,12 +127,6 @@ async def process_document(
     trust_level, access_level = metadata_mod.assign_trust_access(
         meta.get("doc_type"), parsed.source_path
     )
-
-    # doc_id ДЕТЕРМИНИРОВАН из content_hash (uuid5), а не случайный uuid4 —
-    # иначе переимпорт того же файла рождает НОВЫЙ doc_id, writer не находит старый
-    # документ по doc_id и content_hash-skip (§4.5) не срабатывает → дубликаты
-    # (нарушение инварианта №4). Стабильный ключ = идемпотентность.
-    doc_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"nornickel:doc:{parsed.content_hash}"))
     doc_meta: dict[str, Any] = {
         "doc_id": doc_id,
         "title": meta.get("title") or path.stem,
@@ -123,9 +157,17 @@ async def process_document(
     # [5]+[6] validator на КАЖДЫЙ relation: quote-подстрока, regex-числа, whitelist единиц
     #         + числовые поля интервала из units (validate_relation дописывает их в rel).
     chunk_text_by_idx = {getattr(c, "idx", i): getattr(c, "text", "") for i, c in enumerate(chunks)}
+    # §3.3: карта имя→тип для проверки допустимых концов рёбер (validate_endpoints).
+    entity_types = {e.get("name"): e.get("type") for e in merged.get("entities") or []}
+    doc_text = "\n\n".join(getattr(c, "text", "") for c in chunks)  # fallback поиска quote
     for rel in merged.get("relations") or []:
         ctext = chunk_text_by_idx.get(rel.get("chunk_idx"), "")
-        validator_mod.validate_relation(rel, ctext, registry)
+        validator_mod.validate_relation(rel, ctext, registry, doc_text=doc_text)
+        validator_mod.validate_endpoints(rel, entity_types)
+        validator_mod.attach_interval(rel, registry)  # §3.1: интервал на ребро считает код
+    # Детектор смешения контекстов прогонов (03.07): разные значения одного параметра
+    # на общем Material/Process в одном документе → needs_review всей группы.
+    validator_mod.flag_context_ambiguity(merged.get("relations") or [], entity_types)
 
     doc_report: dict[str, Any] = {
         "path": str(path),
@@ -141,6 +183,17 @@ async def process_document(
         "claims": len(merged.get("claims") or []),
         "dropped_dangling": merged.get("dropped_dangling", 0),
         "needs_review": sum(1 for r in (merged.get("relations") or []) if r.get("needs_review")),
+        # Полное извлечение для разбора качества (просьба команды 03.07):
+        # extraction_raw — сырые ответы LLM по чанкам (ровно то, что отдала модель);
+        # extraction — после merge/validate/attach_interval (то, что уехало в граф,
+        # с needs_review/review_reason и интервалами на relations).
+        "extraction_raw": chunk_results,
+        "extraction": {
+            "entities": merged.get("entities") or [],
+            "relations": merged.get("relations") or [],
+            "claims": merged.get("claims") or [],
+            "summary": merged.get("summary") or "",
+        },
     }
 
     if dry_run or client is None:
@@ -261,15 +314,24 @@ async def run_ingest(
     concurrency: int,
     dry_run: bool,
     force: bool = False,
+    model: Optional[str] = None,
+    llm_timeout: Optional[float] = None,
+    doc_timeout: float = 600.0,
 ) -> dict[str, Any]:
-    """Главный конвейер импорта корпуса с семафором по документам."""
+    """Главный конвейер импорта корпуса с семафором по документам.
+
+    `model`/`llm_timeout` — переопределение экстрактора для ВТОРОГО ПРОХОДА
+    (двухпроходная схема): пере-извлечение «плохих» документов сильной моделью,
+    например --model qwen3-235b-a22b-fp8/latest --llm-timeout 300.
+    """
     settings = get_settings()
     files = discover_files(corpus, glob, limit)
     log.info("Найдено файлов: %d (corpus=%s, glob=%s, limit=%s)", len(files), corpus, glob, limit)
 
     # Офлайн-импорт: сильная модель-экстрактор (qwen3-235b) отвечает 30-40 c, поэтому
     # даём щедрый таймаут вместо онлайнового fail-fast бюджета LLM_TIMEOUT_S=15 (§4 vs §5.4).
-    llm = YandexLLM(settings, timeout_s=max(float(settings.llm_timeout_s), 90.0))
+    timeout_s = float(llm_timeout) if llm_timeout else max(float(settings.llm_timeout_s), 90.0)
+    llm = YandexLLM(settings, timeout_s=timeout_s, default_model=model)
     canonizer = canonizer_mod.Canonizer()
     registry = units_mod.UnitRegistry()
 
@@ -287,14 +349,21 @@ async def run_ingest(
     async def guarded(path: Path) -> None:
         async with sem:
             try:
-                rep = await process_document(
-                    path,
-                    llm=llm,
-                    canonizer=canonizer,
-                    registry=registry,
-                    client=client,
-                    dry_run=dry_run,
-                    force=force,
+                # Сторожевой таймаут на ДОКУМЕНТ ЦЕЛИКОМ (03.07): обрыв сети оставил
+                # await висеть 4.5 часа несмотря на пер-вызовные таймауты (мёртвый
+                # сокет без RST). Никакое зависание не должно останавливать корпус —
+                # документ падает с TimeoutError, конвейер продолжает (инвариант №9).
+                rep = await asyncio.wait_for(
+                    process_document(
+                        path,
+                        llm=llm,
+                        canonizer=canonizer,
+                        registry=registry,
+                        client=client,
+                        dry_run=dry_run,
+                        force=force,
+                    ),
+                    timeout=doc_timeout,
                 )
                 doc_reports.append(rep)
                 log.info(
@@ -406,6 +475,13 @@ def main() -> int:
     ap.add_argument("--dry-run", action="store_true", help="без записи в граф (парсинг+извлечение)")
     ap.add_argument("--force", action="store_true",
                     help="переимпорт даже при совпадении content_hash (очистка+перезапись §4.5)")
+    ap.add_argument("--model", type=str, default=None,
+                    help="модель-экстрактор вместо YC_MODEL_EXTRACT "
+                         "(второй проход: qwen3-235b-a22b-fp8/latest)")
+    ap.add_argument("--llm-timeout", type=float, default=None,
+                    help="таймаут LLM, сек (второй проход qwen: 300)")
+    ap.add_argument("--doc-timeout", type=float, default=600.0,
+                    help="сторожевой таймаут на документ целиком, сек (03.07)")
     args = ap.parse_args()
 
     if not args.corpus.exists():
@@ -421,6 +497,9 @@ def main() -> int:
                 concurrency=args.concurrency,
                 dry_run=args.dry_run,
                 force=args.force,
+                model=args.model,
+                llm_timeout=args.llm_timeout,
+                doc_timeout=args.doc_timeout,
             )
         )
     except Exception as err:  # noqa: BLE001 — фатальная ошибка конвейера (не отдельного документа)

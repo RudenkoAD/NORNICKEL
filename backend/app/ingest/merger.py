@@ -61,6 +61,9 @@ from typing import Any, Optional
 # Порог склейки summary документа (§4 шаг 8): «~250 токенов» ≈ ~1000 символов для русского.
 SUMMARY_CHAR_LIMIT = 1000
 
+# Буквенно-цифровые символы для проверки информативности имени сущности (03.07).
+_ALNUM_RE = re.compile(r"[^0-9a-zа-яё]", re.IGNORECASE)
+
 
 def normalize(name: str) -> str:
     """Локальная нормализация имени: lowercase, ё→е, trim, схлопывание пробелов.
@@ -96,6 +99,7 @@ def merge_document(chunk_results: list, chunks: list) -> dict:
 
     # chunk_results идут в порядке chunks (extract_document, §4 шаг 4) — сопоставляем
     # позиционно, chunk_idx берём из соответствующего chunk.idx (провенанс §4.1).
+    dropped_short = 0
     for result, chunk_idx in _iter_with_idx(chunk_results, chunks):
         if not _is_extraction(result):
             continue
@@ -103,6 +107,12 @@ def merge_document(chunk_results: list, chunks: list) -> dict:
             etype = ent.get("type")
             name = ent.get("name")
             if not etype or not name:
+                continue
+            # Обрезки, сноски и маркеры таблиц («Л*», «а)», «*») — не сущности (03.07):
+            # после снятия небуквенно-цифровых символов должно остаться >= 2 знаков.
+            # Их relations станут висячими и уйдут в dropped_dangling ниже.
+            if len(_ALNUM_RE.sub("", name)) < 2:
+                dropped_short += 1
                 continue
             key = (etype, normalize(name))
             doc_norm_names.add(normalize(name))
@@ -191,6 +201,7 @@ def merge_document(chunk_results: list, chunks: list) -> dict:
         "claims": claims,
         "summary": summary,
         "dropped_dangling": dropped_dangling,
+        "dropped_short": dropped_short,
     }
 
 
