@@ -1,0 +1,40 @@
+{
+  "started_at": "2026-07-03T09:28:21.577503+00:00",
+  "corpus": "/Users/rudenkoad/Documents/my_projects/NORNICKEL/corpus",
+  "glob": "*",
+  "limit": 1,
+  "dry_run": false,
+  "totals": {
+    "documents_ok": 1,
+    "documents_fail": 0,
+    "written": 1,
+    "skipped": 0,
+    "needs_review": 0,
+    "unknown_units": 0
+  },
+  "documents": [
+    {
+      "path": "/Users/rudenkoad/Documents/my_projects/NORNICKEL/corpus/Доклады/Доклад_Вострикова Н.М.pdf",
+      "doc_id": "8948a347-b87a-5bdd-9c12-9b0cf87a95ae",
+      "title": "Доклад",
+      "doc_type": "report",
+      "access_level": "public",
+      "trust_level": "medium",
+      "chunks_ok": 1,
+      "chunks_failed": 0,
+      "entities": 17,
+      "relations": 0,
+      "claims": 2,
+      "dropped_dangling": 0,
+      "needs_review": 0,
+      "skipped": false,
+      "written": true,
+      "written_entities": 17,
+      "written_relations": 0,
+      "written_claims": 2,
+      "elapsed_s": 11.89
+    }
+  ],
+  "failures": [],
+  "unknown_units": []
+}

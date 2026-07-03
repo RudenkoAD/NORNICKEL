@@ -1,0 +1,436 @@
+#!/usr/bin/env python3
+"""Пакетный импорт корпуса в граф знаний (ARCHITECTURE.md §4, P1-пункт §12).
+
+Полный конвейер §4 на каждый документ:
+  parse → extract_metadata → assign_trust_access → chunk → extract_document →
+  merge → validate_relation(на каждый relation) → canonize(в writer) →
+  embed(чанки + summary) → write_document.
+
+Документы обрабатываются конкурентно с семафором ПО ДОКУМЕНТАМ (asyncio, default 4);
+ошибка ОДНОГО документа НЕ валит корпус (try/except + явный лог). Отчёт — JSON в
+reports/ingest_<ts>.json + печать: ok/fail, needs_review, алерт unknown_units с
+YAML-черновиками правил (§4.3 — черновик через LLM, НЕ автоприменение).
+
+Использование:
+    poetry run python scripts/ingest_corpus.py                 # весь корпус
+    poetry run python scripts/ingest_corpus.py --limit 3       # первые 3 (замер скорости §12-P0)
+    poetry run python scripts/ingest_corpus.py --glob '*.pdf'  # только PDF
+    poetry run python scripts/ingest_corpus.py --dry-run       # парсинг+извлечение без записи
+"""
+
+from __future__ import annotations
+
+import argparse
+import asyncio
+import json
+import logging
+import sys
+import time
+import uuid
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Optional
+
+# Запуск как `python scripts/ingest_corpus.py` без установки пакета.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from app.config import get_settings  # noqa: E402
+from app.db.neo4j_client import Neo4jClient  # noqa: E402
+from app.ingest import canonizer as canonizer_mod  # noqa: E402
+from app.ingest import chunker as chunker_mod  # noqa: E402
+from app.ingest import extractor as extractor_mod  # noqa: E402
+from app.ingest import merger as merger_mod  # noqa: E402
+from app.ingest import metadata as metadata_mod  # noqa: E402
+from app.ingest import parser as parser_mod  # noqa: E402
+from app.ingest import units as units_mod  # noqa: E402
+from app.ingest import validator as validator_mod  # noqa: E402
+from app.ingest import writer as writer_mod  # noqa: E402
+from app.llm import embeddings as emb_mod  # noqa: E402
+from app.llm.yandex import LLMError, YandexLLM  # noqa: E402
+
+log = logging.getLogger("ingest_corpus")
+
+DEFAULT_CORPUS = Path("/Users/rudenkoad/Documents/my_projects/NORNICKEL/corpus")
+REPORTS_DIR = Path(__file__).resolve().parents[1] / "reports"
+SUPPORTED_SUFFIXES = {".pdf", ".docx", ".pptx", ".md", ".txt"}
+# Первые ~2 страницы для метаданных (§4 шаг 2): грубая отсечка по символам.
+METADATA_HEAD_CHARS = 4000
+
+
+# ---------------------------------------------------------------------------
+# Обработка одного документа (весь конвейер §4)
+# ---------------------------------------------------------------------------
+async def process_document(
+    path: Path,
+    *,
+    llm: YandexLLM,
+    canonizer: Any,
+    registry: Any,
+    client: Optional[Neo4jClient],
+    dry_run: bool,
+    force: bool = False,
+) -> dict[str, Any]:
+    """Прогоняет один файл через весь конвейер §4. Возвращает per-doc отчёт.
+
+    Ошибку НЕ подавляет здесь — её ловит и логирует вызывающий (семафорная обёртка),
+    чтобы один плохой документ не свалил корпус (§4.1).
+    """
+    t0 = time.monotonic()
+
+    # [1] parser: текст + content_hash.
+    parsed = parser_mod.parse_file(path)
+
+    # [2] метаданные (LLM по первым ~2 стр.) + ДЕТЕРМИНИРОВАННЫЕ trust/access (§4 шаг 2).
+    meta = await metadata_mod.extract_metadata(
+        llm, parsed.text[:METADATA_HEAD_CHARS], path.name
+    )
+    trust_level, access_level = metadata_mod.assign_trust_access(
+        meta.get("doc_type"), parsed.source_path
+    )
+
+    # doc_id ДЕТЕРМИНИРОВАН из content_hash (uuid5), а не случайный uuid4 —
+    # иначе переимпорт того же файла рождает НОВЫЙ doc_id, writer не находит старый
+    # документ по doc_id и content_hash-skip (§4.5) не срабатывает → дубликаты
+    # (нарушение инварианта №4). Стабильный ключ = идемпотентность.
+    doc_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"nornickel:doc:{parsed.content_hash}"))
+    doc_meta: dict[str, Any] = {
+        "doc_id": doc_id,
+        "title": meta.get("title") or path.stem,
+        "authors": meta.get("authors") or [],
+        "year": meta.get("year"),
+        "doc_type": meta.get("doc_type"),
+        "language": meta.get("language"),
+        "geography": meta.get("geography"),
+        "country": meta.get("country"),
+        "trust_level": trust_level,
+        "access_level": access_level,
+        "content_hash": parsed.content_hash,
+        "source_path": parsed.source_path,
+        "imported_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    # [3] chunker: ~3500 токенов, overlap 300, по абзацам.
+    chunks = chunker_mod.chunk_text(parsed.text)
+
+    # [4] extractor: LLM-проход по чанкам ОДНОГО документа последовательно
+    #     (known_entities накапливаются внутри extract_document).
+    chunk_results, extract_stats = await extractor_mod.extract_document(llm, chunks)
+
+    # [8] merger: dedup сущностей, отбрасывание висячих relations, summary документа.
+    merged = merger_mod.merge_document(chunk_results, chunks)
+    doc_meta["summary"] = merged.get("summary") or ""
+
+    # [5]+[6] validator на КАЖДЫЙ relation: quote-подстрока, regex-числа, whitelist единиц
+    #         + числовые поля интервала из units (validate_relation дописывает их в rel).
+    chunk_text_by_idx = {getattr(c, "idx", i): getattr(c, "text", "") for i, c in enumerate(chunks)}
+    for rel in merged.get("relations") or []:
+        ctext = chunk_text_by_idx.get(rel.get("chunk_idx"), "")
+        validator_mod.validate_relation(rel, ctext, registry)
+
+    doc_report: dict[str, Any] = {
+        "path": str(path),
+        "doc_id": doc_id,
+        "title": doc_meta["title"],
+        "doc_type": doc_meta["doc_type"],
+        "access_level": access_level,
+        "trust_level": trust_level,
+        "chunks_ok": extract_stats.get("chunks_ok", 0),
+        "chunks_failed": extract_stats.get("chunks_failed", 0),
+        "entities": len(merged.get("entities") or []),
+        "relations": len(merged.get("relations") or []),
+        "claims": len(merged.get("claims") or []),
+        "dropped_dangling": merged.get("dropped_dangling", 0),
+        "needs_review": sum(1 for r in (merged.get("relations") or []) if r.get("needs_review")),
+    }
+
+    if dry_run or client is None:
+        doc_report["skipped"] = None
+        doc_report["written"] = False
+        doc_report["elapsed_s"] = round(time.monotonic() - t0, 2)
+        return doc_report
+
+    # [9] embedder: эмбеддинги чанков + summary документа. Одна модель везде (инвариант №7).
+    chunk_texts = [getattr(c, "text", "") for c in chunks]
+    chunk_embeddings = await emb_mod.embed_docs(chunk_texts) if chunk_texts else []
+    summary_text = doc_meta["summary"] or doc_meta["title"]
+    doc_embedding = await emb_mod.embed_doc(summary_text)
+    doc_meta["embedding"] = doc_embedding
+
+    # [10] writer: идемпотентная транзакционная запись (§4.5). Канонизация — внутри writer.
+    write_report = writer_mod.write_document(
+        client=client,
+        doc_meta=doc_meta,
+        merged=merged,
+        canonizer=canonizer,
+        registry=registry,
+        chunk_embeddings=chunk_embeddings,
+        doc_embedding=doc_embedding,
+        chunks=chunks,
+        force=force,
+    )
+    doc_report["skipped"] = write_report.get("skipped", False)
+    doc_report["written"] = not write_report.get("skipped", False)
+    doc_report["written_entities"] = write_report.get("entities", 0)
+    doc_report["written_relations"] = write_report.get("relations", 0)
+    doc_report["written_claims"] = write_report.get("claims", 0)
+    doc_report["elapsed_s"] = round(time.monotonic() - t0, 2)
+    return doc_report
+
+
+# ---------------------------------------------------------------------------
+# unknown_units → LLM-черновик правила (§4.3): НЕ автоприменение
+# ---------------------------------------------------------------------------
+async def draft_unknown_unit_rules(
+    llm: YandexLLM, registry: Any
+) -> list[dict[str, Any]]:
+    """Для каждой нераспознанной единицы — один LLM-вызов «предложи конвертацию»
+    → готовая YAML-строка в алерт. Правило человек проверяет глазами и вставляет в
+    units.yaml вручную (инвариант №1, §4.3). Молча ничего не применяем.
+    """
+    unknowns = []
+    try:
+        unknowns = registry.unknown_units_report()
+    except Exception as err:  # noqa: BLE001 — отчёт по единицам не должен валить импорт
+        log.warning("unknown_units_report недоступен: %s", err)
+        return []
+
+    drafts: list[dict[str, Any]] = []
+    for item in unknowns:
+        unit_raw = item.get("unit_raw")
+        examples = item.get("examples") or []
+        draft = {
+            "unit_raw": unit_raw,
+            "count": item.get("count"),
+            "doc_ids": item.get("doc_ids"),
+            "examples": examples,
+            "llm_draft_rule": None,
+            "yaml_draft": None,
+        }
+        try:
+            system = (
+                "Ты — помощник по единицам измерения в металлургии. Предложи конвертацию "
+                "нераспознанной единицы в каноническую единицу её категории. Верни СТРОГО JSON: "
+                '{"unit_canon": "...", "multiplier": <число>, "offset": <число>, '
+                '"category": "concentration|temperature|flow_rate|pressure|ph|economic|environment|other", '
+                '"confidence": "high|medium|low", "explanation": "..."}'
+            )
+            user = (
+                f"Единица: «{unit_raw}». Примеры из текста: {examples[:3]}. "
+                "Как перевести значение в этой единице в каноническую единицу категории?"
+            )
+            rule = await llm.chat_json(system, user)
+            draft["llm_draft_rule"] = rule
+            draft["yaml_draft"] = _rule_to_yaml(unit_raw, rule)
+        except LLMError as err:
+            log.warning("LLM-черновик для единицы «%s» не получен: %s", unit_raw, err)
+        drafts.append(draft)
+    return drafts
+
+
+def _rule_to_yaml(unit_raw: Optional[str], rule: dict[str, Any]) -> str:
+    """Готовая YAML-строка правила для копирования в units.yaml (человек проверяет)."""
+    unit_canon = rule.get("unit_canon")
+    mult = rule.get("multiplier")
+    offset = rule.get("offset")
+    conf = rule.get("confidence")
+    return (
+        f'  "{unit_raw}": {{ unit_canon: "{unit_canon}", multiplier: {mult}, '
+        f"offset: {offset} }}  # LLM-черновик (confidence={conf}) — ПРОВЕРИТЬ вручную"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Оркестрация корпуса
+# ---------------------------------------------------------------------------
+def discover_files(corpus: Path, glob: str, limit: Optional[int]) -> list[Path]:
+    """Собирает поддерживаемые файлы корпуса (рекурсивно) по glob-шаблону."""
+    files = [
+        p
+        for p in sorted(corpus.rglob(glob))
+        if p.is_file() and p.suffix.lower() in SUPPORTED_SUFFIXES
+    ]
+    if limit is not None:
+        files = files[:limit]
+    return files
+
+
+async def run_ingest(
+    corpus: Path,
+    glob: str,
+    limit: Optional[int],
+    concurrency: int,
+    dry_run: bool,
+    force: bool = False,
+) -> dict[str, Any]:
+    """Главный конвейер импорта корпуса с семафором по документам."""
+    settings = get_settings()
+    files = discover_files(corpus, glob, limit)
+    log.info("Найдено файлов: %d (corpus=%s, glob=%s, limit=%s)", len(files), corpus, glob, limit)
+
+    # Офлайн-импорт: сильная модель-экстрактор (qwen3-235b) отвечает 30-40 c, поэтому
+    # даём щедрый таймаут вместо онлайнового fail-fast бюджета LLM_TIMEOUT_S=15 (§4 vs §5.4).
+    llm = YandexLLM(settings, timeout_s=max(float(settings.llm_timeout_s), 90.0))
+    canonizer = canonizer_mod.Canonizer()
+    registry = units_mod.UnitRegistry()
+
+    client: Optional[Neo4jClient] = None
+    if not dry_run:
+        client = Neo4jClient(settings)
+        if not client.wait_until_ready(timeout_s=30):
+            client.close()
+            raise RuntimeError(f"Neo4j недоступен на {settings.neo4j_uri} (инвариант №9)")
+
+    sem = asyncio.Semaphore(concurrency)
+    doc_reports: list[dict[str, Any]] = []
+    failures: list[dict[str, Any]] = []
+
+    async def guarded(path: Path) -> None:
+        async with sem:
+            try:
+                rep = await process_document(
+                    path,
+                    llm=llm,
+                    canonizer=canonizer,
+                    registry=registry,
+                    client=client,
+                    dry_run=dry_run,
+                    force=force,
+                )
+                doc_reports.append(rep)
+                log.info(
+                    "OK  %s  (ent=%d rel=%d claims=%d nr=%d %.1fs)",
+                    path.name,
+                    rep.get("entities", 0),
+                    rep.get("relations", 0),
+                    rep.get("claims", 0),
+                    rep.get("needs_review", 0),
+                    rep.get("elapsed_s", 0.0),
+                )
+            except Exception as err:  # noqa: BLE001 — один документ не валит корпус (§4.1)
+                log.error("FAIL %s — %s", path.name, err, exc_info=True)
+                failures.append({"path": str(path), "error": repr(err)})
+
+    try:
+        await asyncio.gather(*(guarded(p) for p in files))
+        # unknown_units-алерт с LLM-черновиками (§4.3) — после прогона корпуса.
+        unknown_units = await draft_unknown_unit_rules(llm, registry)
+    finally:
+        if client is not None:
+            client.close()
+
+    return _assemble_report(
+        corpus=corpus,
+        glob=glob,
+        limit=limit,
+        dry_run=dry_run,
+        doc_reports=doc_reports,
+        failures=failures,
+        unknown_units=unknown_units,
+    )
+
+
+def _assemble_report(
+    *,
+    corpus: Path,
+    glob: str,
+    limit: Optional[int],
+    dry_run: bool,
+    doc_reports: list[dict[str, Any]],
+    failures: list[dict[str, Any]],
+    unknown_units: list[dict[str, Any]],
+) -> dict[str, Any]:
+    skipped = sum(1 for r in doc_reports if r.get("skipped") is True)
+    written = sum(1 for r in doc_reports if r.get("written"))
+    needs_review = sum(r.get("needs_review", 0) for r in doc_reports)
+    return {
+        "started_at": datetime.now(timezone.utc).isoformat(),
+        "corpus": str(corpus),
+        "glob": glob,
+        "limit": limit,
+        "dry_run": dry_run,
+        "totals": {
+            "documents_ok": len(doc_reports),
+            "documents_fail": len(failures),
+            "written": written,
+            "skipped": skipped,
+            "needs_review": needs_review,
+            "unknown_units": len(unknown_units),
+        },
+        "documents": doc_reports,
+        "failures": failures,
+        "unknown_units": unknown_units,
+    }
+
+
+def _write_report(report: dict[str, Any]) -> Path:
+    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    out = REPORTS_DIR / f"ingest_{ts}.json"
+    out.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    return out
+
+
+def _print_summary(report: dict[str, Any], out_path: Path) -> None:
+    t = report["totals"]
+    print("\n=== Импорт корпуса — итог ===")
+    print(f"Документов ok:   {t['documents_ok']}")
+    print(f"Документов fail: {t['documents_fail']}")
+    print(f"Записано:        {t['written']}")
+    print(f"Пропущено (hash):{t['skipped']}")
+    print(f"needs_review:    {t['needs_review']}")
+    print(f"Отчёт: {out_path}")
+
+    for f in report.get("failures", []):
+        print(f"  FAIL {f['path']}: {f['error']}")
+
+    unknowns = report.get("unknown_units") or []
+    if unknowns:
+        print(f"\n⚠ АЛЕРТ unknown_units — {len(unknowns)} нераспознанных единиц (§4.3).")
+        print("  Проверьте черновики глазами и вставьте в data/units.yaml, затем переимпортируйте:")
+        for u in unknowns:
+            print(f"  • «{u.get('unit_raw')}» (×{u.get('count')}), примеры: {u.get('examples', [])[:2]}")
+            if u.get("yaml_draft"):
+                print(f"    {u['yaml_draft']}")
+
+
+def main() -> int:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
+    ap = argparse.ArgumentParser(description="Пакетный импорт корпуса в граф (§4)")
+    ap.add_argument("--corpus", type=Path, default=DEFAULT_CORPUS, help="каталог корпуса")
+    ap.add_argument("--limit", type=int, default=None, help="ограничить число документов")
+    ap.add_argument("--glob", type=str, default="*", help="glob-шаблон файлов (рекурсивно)")
+    ap.add_argument("--concurrency", type=int, default=4, help="семафор ПО ДОКУМЕНТАМ")
+    ap.add_argument("--dry-run", action="store_true", help="без записи в граф (парсинг+извлечение)")
+    ap.add_argument("--force", action="store_true",
+                    help="переимпорт даже при совпадении content_hash (очистка+перезапись §4.5)")
+    args = ap.parse_args()
+
+    if not args.corpus.exists():
+        print(f"Каталог корпуса не найден: {args.corpus}", file=sys.stderr)
+        return 2
+
+    try:
+        report = asyncio.run(
+            run_ingest(
+                corpus=args.corpus,
+                glob=args.glob,
+                limit=args.limit,
+                concurrency=args.concurrency,
+                dry_run=args.dry_run,
+                force=args.force,
+            )
+        )
+    except Exception as err:  # noqa: BLE001 — фатальная ошибка конвейера (не отдельного документа)
+        log.error("Импорт прерван: %s", err, exc_info=True)
+        return 1
+
+    out_path = _write_report(report)
+    _print_summary(report, out_path)
+    return 0 if report["totals"]["documents_fail"] == 0 else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

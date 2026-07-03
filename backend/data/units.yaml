@@ -1,0 +1,168 @@
+# Единицы измерения и конвертации — детерминированное ядро числового контура
+# (ARCHITECTURE.md §3.1, §4.3, инвариант №1: числа парсит только код, никогда LLM).
+#
+# Структура:
+#   categories:  ТИП параметра → каноническая единица (в неё конвертируется всё) +
+#                abs_delta для оператора «~» при v==0 (§3.1: нет дельты → needs_review).
+#   units:       любое написание единицы (латиница/кириллица, «3» вместо «³», …) →
+#                {category, multiplier, offset}. Конвертация в каноническую:
+#                    value_canon = value * multiplier + offset
+#                Каноническая единица категории имеет multiplier=1, offset=0.
+#
+# Одни и те же данные использует импорт (units.py при записи) и query-сторона
+# (units.py при разборе фильтров запроса, §5.2). Нераспознанная единица НЕ
+# конвертируется наугад — уходит в фоллбек-контур unknown_units (§4.3, уровень 2).
+
+categories:
+  concentration:
+    canonical_unit: "мг/л"
+    abs_delta: 10.0          # ±10 мг/л для «около 0» концентрации
+  temperature:
+    canonical_unit: "°C"
+    abs_delta: 2.0           # ±2 °C (§3.1, пример)
+  flow_rate:
+    canonical_unit: "м³/ч"
+    abs_delta: 0.5
+  pressure:
+    canonical_unit: "МПа"
+    abs_delta: 0.05
+  ph:
+    canonical_unit: "pH"
+    abs_delta: 0.5           # ±0.5 pH (§3.1, пример)
+  economic:
+    canonical_unit: "руб/т"
+    abs_delta: null          # для денег «около 0» бессмысленно → needs_review
+  environment:
+    canonical_unit: null     # категориальные условия среды — value_text, без чисел
+    abs_delta: null
+  mass_rate:
+    canonical_unit: "т/сут"
+    abs_delta: 0.1
+  current_density:
+    canonical_unit: "А/м²"
+    abs_delta: 5.0
+  voltage:
+    canonical_unit: "В"
+    abs_delta: 0.1
+  recovery:
+    canonical_unit: "%"
+    abs_delta: 1.0           # степень извлечения / выход / доля, «около 0» → ±1 %
+  other:
+    canonical_unit: null
+    abs_delta: null
+
+units:
+  # --- Концентрация → мг/л ---
+  "мг/л":     {category: concentration, multiplier: 1.0, offset: 0.0}
+  "mg/l":     {category: concentration, multiplier: 1.0, offset: 0.0}
+  "mg/L":     {category: concentration, multiplier: 1.0, offset: 0.0}
+  "мг/дм³":   {category: concentration, multiplier: 1.0, offset: 0.0}
+  "мг/дм3":   {category: concentration, multiplier: 1.0, offset: 0.0}
+  "mg/dm³":   {category: concentration, multiplier: 1.0, offset: 0.0}
+  "mg/dm3":   {category: concentration, multiplier: 1.0, offset: 0.0}
+  "г/л":      {category: concentration, multiplier: 1000.0, offset: 0.0}
+  "g/l":      {category: concentration, multiplier: 1000.0, offset: 0.0}
+  "g/L":      {category: concentration, multiplier: 1000.0, offset: 0.0}
+  "г/дм³":    {category: concentration, multiplier: 1000.0, offset: 0.0}
+  "г/дм3":    {category: concentration, multiplier: 1000.0, offset: 0.0}
+  "g/dm³":    {category: concentration, multiplier: 1000.0, offset: 0.0}
+  "g/dm3":    {category: concentration, multiplier: 1000.0, offset: 0.0}
+  "мкг/л":    {category: concentration, multiplier: 0.001, offset: 0.0}
+  "мкг/дм³":  {category: concentration, multiplier: 0.001, offset: 0.0}
+  "µg/l":     {category: concentration, multiplier: 0.001, offset: 0.0}
+  "мг/мл":    {category: concentration, multiplier: 1000.0, offset: 0.0}
+  "mg/ml":    {category: concentration, multiplier: 1000.0, offset: 0.0}
+  "г/м³":     {category: concentration, multiplier: 1.0, offset: 0.0}
+  "г/м3":     {category: concentration, multiplier: 1.0, offset: 0.0}
+
+  # --- Температура → °C ---
+  "°C":       {category: temperature, multiplier: 1.0, offset: 0.0}
+  "°с":       {category: temperature, multiplier: 1.0, offset: 0.0}
+  "℃":        {category: temperature, multiplier: 1.0, offset: 0.0}
+  "C":        {category: temperature, multiplier: 1.0, offset: 0.0}
+  "град C":   {category: temperature, multiplier: 1.0, offset: 0.0}
+  "градусов": {category: temperature, multiplier: 1.0, offset: 0.0}
+  "K":        {category: temperature, multiplier: 1.0, offset: -273.15}
+  "К":        {category: temperature, multiplier: 1.0, offset: -273.15}
+  "°K":       {category: temperature, multiplier: 1.0, offset: -273.15}
+
+  # --- Расход / скорость потока → м³/ч ---
+  "м³/ч":     {category: flow_rate, multiplier: 1.0, offset: 0.0}
+  "м3/ч":     {category: flow_rate, multiplier: 1.0, offset: 0.0}
+  "m³/h":     {category: flow_rate, multiplier: 1.0, offset: 0.0}
+  "m3/h":     {category: flow_rate, multiplier: 1.0, offset: 0.0}
+  "л/мин":    {category: flow_rate, multiplier: 0.06, offset: 0.0}     # 1 л/мин = 0.06 м³/ч
+  "l/min":    {category: flow_rate, multiplier: 0.06, offset: 0.0}
+  "л/ч":      {category: flow_rate, multiplier: 0.001, offset: 0.0}
+  "l/h":      {category: flow_rate, multiplier: 0.001, offset: 0.0}
+  "л/с":      {category: flow_rate, multiplier: 3.6, offset: 0.0}      # 1 л/с = 3.6 м³/ч
+  "l/s":      {category: flow_rate, multiplier: 3.6, offset: 0.0}
+  "м³/сут":   {category: flow_rate, multiplier: 0.0416667, offset: 0.0}  # /24
+  "м3/сут":   {category: flow_rate, multiplier: 0.0416667, offset: 0.0}
+
+  # --- Давление → МПа ---
+  "МПа":      {category: pressure, multiplier: 1.0, offset: 0.0}
+  "MPa":      {category: pressure, multiplier: 1.0, offset: 0.0}
+  "кПа":      {category: pressure, multiplier: 0.001, offset: 0.0}
+  "kPa":      {category: pressure, multiplier: 0.001, offset: 0.0}
+  "Па":       {category: pressure, multiplier: 0.000001, offset: 0.0}
+  "Pa":       {category: pressure, multiplier: 0.000001, offset: 0.0}
+  "атм":      {category: pressure, multiplier: 0.101325, offset: 0.0}
+  "atm":      {category: pressure, multiplier: 0.101325, offset: 0.0}
+  "бар":      {category: pressure, multiplier: 0.1, offset: 0.0}
+  "bar":      {category: pressure, multiplier: 0.1, offset: 0.0}
+  "кгс/см²":  {category: pressure, multiplier: 0.0980665, offset: 0.0}
+  "кгс/см2":  {category: pressure, multiplier: 0.0980665, offset: 0.0}
+
+  # --- pH (безразмерный, но со своей категорией и дельтой) ---
+  "pH":       {category: ph, multiplier: 1.0, offset: 0.0}
+  "рН":       {category: ph, multiplier: 1.0, offset: 0.0}
+  "ед. pH":   {category: ph, multiplier: 1.0, offset: 0.0}
+
+  # --- Массовый расход / производительность → т/сут ---
+  "т/сут":    {category: mass_rate, multiplier: 1.0, offset: 0.0}
+  "т/сутки":  {category: mass_rate, multiplier: 1.0, offset: 0.0}
+  "t/day":    {category: mass_rate, multiplier: 1.0, offset: 0.0}
+  "кг/ч":     {category: mass_rate, multiplier: 0.024, offset: 0.0}   # 1 кг/ч = 0.024 т/сут
+  "kg/h":     {category: mass_rate, multiplier: 0.024, offset: 0.0}
+  "т/ч":      {category: mass_rate, multiplier: 24.0, offset: 0.0}
+  "t/h":      {category: mass_rate, multiplier: 24.0, offset: 0.0}
+  "кг/сут":   {category: mass_rate, multiplier: 0.001, offset: 0.0}
+  "т/год":    {category: mass_rate, multiplier: 0.00273973, offset: 0.0}  # /365
+
+  # --- Плотность тока → А/м² ---
+  "А/м²":     {category: current_density, multiplier: 1.0, offset: 0.0}
+  "А/м2":     {category: current_density, multiplier: 1.0, offset: 0.0}
+  "A/m²":     {category: current_density, multiplier: 1.0, offset: 0.0}
+  "A/m2":     {category: current_density, multiplier: 1.0, offset: 0.0}
+  "А/дм²":    {category: current_density, multiplier: 100.0, offset: 0.0}  # 1 А/дм² = 100 А/м²
+  "А/дм2":    {category: current_density, multiplier: 100.0, offset: 0.0}
+  "A/dm²":    {category: current_density, multiplier: 100.0, offset: 0.0}
+  "мА/см²":   {category: current_density, multiplier: 10.0, offset: 0.0}   # 1 мА/см² = 10 А/м²
+
+  # --- Напряжение → В ---
+  "В":        {category: voltage, multiplier: 1.0, offset: 0.0}
+  "V":        {category: voltage, multiplier: 1.0, offset: 0.0}
+  "мВ":       {category: voltage, multiplier: 0.001, offset: 0.0}
+  "mV":       {category: voltage, multiplier: 0.001, offset: 0.0}
+  "кВ":       {category: voltage, multiplier: 1000.0, offset: 0.0}
+  "kV":       {category: voltage, multiplier: 1000.0, offset: 0.0}
+
+  # --- Доля / выход / степень извлечения → % ---
+  "%":        {category: recovery, multiplier: 1.0, offset: 0.0}
+  "процентов": {category: recovery, multiplier: 1.0, offset: 0.0}
+  "%масс":    {category: recovery, multiplier: 1.0, offset: 0.0}
+  "мас.%":    {category: recovery, multiplier: 1.0, offset: 0.0}
+  "об.%":     {category: recovery, multiplier: 1.0, offset: 0.0}
+  "г/т":      {category: recovery, multiplier: 0.0001, offset: 0.0}  # ппм по массе ≈ 1e-4 %
+
+  # --- Экономические (ТЭП, §1 сценарий 6) → руб/т ---
+  "руб/т":    {category: economic, multiplier: 1.0, offset: 0.0}
+  "руб./т":   {category: economic, multiplier: 1.0, offset: 0.0}
+  "р/т":      {category: economic, multiplier: 1.0, offset: 0.0}
+  "руб/тонну": {category: economic, multiplier: 1.0, offset: 0.0}
+  "тыс. руб/т": {category: economic, multiplier: 1000.0, offset: 0.0}
+  "$/т":      {category: economic, multiplier: null, offset: 0.0}   # курс валют не конвертируем
+  "$/t":      {category: economic, multiplier: null, offset: 0.0}
+  "USD/т":    {category: economic, multiplier: null, offset: 0.0}
+  "долл/т":   {category: economic, multiplier: null, offset: 0.0}

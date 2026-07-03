@@ -1,0 +1,50 @@
+# equipment.csv — справочник ОБОРУДОВАНИЯ (ARCHITECTURE.md §3.2, узел Equipment).
+# КУРИРОВАННЫЙ СТАРТОВЫЙ набор горно-металлургического домена Норникеля.
+# ЗАМЕНИТЬ файлами кейса — формат тот же (README_DB-стиль).
+# Колонки согласованы с CanonEntity и схемой узла Equipment (§3.2):
+#   canonical_id — стабильный ключ (canonical_id, §3.4)
+#   name_ru, name_en — канонические имена; en-алиасы дозаполняет load_references из глоссария
+#   aliases — синонимы через ';' ВНУТРИ ячейки (§4.4)
+#   type — класс оборудования (furnace/cell/reactor/separator/pump/exchanger/tank/mill)
+canonical_id,name_ru,name_en,aliases,type
+flash_furnace,печь взвешенной плавки,flash smelting furnace,ПВП;печь ВП,furnace
+electric_furnace,электропечь,electric furnace,руднотермическая печь;РТП,furnace
+tube_furnace,трубчатая печь,tube furnace,трубчатая вращающаяся печь;вращающаяся печь,furnace
+converter,конвертер,converter,горизонтальный конвертер;конвертер Пирса-Смита,furnace
+anode_furnace,анодная печь,anode furnace,,furnace
+roasting_furnace,обжиговая печь,roasting furnace,печь кипящего слоя,furnace
+electrolysis_cell,ванна электролиза,electrolysis cell,электролизная ванна;электролизёр,cell
+diaphragm_cell,диафрагменная ячейка,diaphragm cell,диафрагменный электролизёр,cell
+electrowinning_cell,ванна электроэкстракции,electrowinning cell,ячейка электроэкстракции,cell
+electrolyzer,электролизёр,electrolyzer,электролизная установка,cell
+autoclave,автоклав,autoclave,автоклавный реактор;горизонтальный автоклав,reactor
+reactor,реактор,reactor,химический реактор,reactor
+leaching_tank,выщелачивающий чан,leaching tank,реактор выщелачивания;пачук,reactor
+crystallizer,кристаллизатор,crystallizer,вакуум-кристаллизатор,reactor
+flotation_machine,флотомашина,flotation machine,флотационная машина;флотоячейка,separator
+thickener,сгуститель,thickener,радиальный сгуститель,separator
+clarifier,осветлитель,clarifier,,separator
+filter_press,фильтр-пресс,filter press,камерный фильтр-пресс,separator
+vacuum_filter,вакуум-фильтр,vacuum filter,дисковый вакуум-фильтр,separator
+centrifuge,центрифуга,centrifuge,,separator
+cyclone,гидроциклон,hydrocyclone,циклон,separator
+extractor,экстрактор,extractor,смеситель-отстойник;mixer-settler,separator
+ball_mill,шаровая мельница,ball mill,,mill
+sag_mill,мельница самоизмельчения,SAG mill,,mill
+membrane_unit,мембранная установка,membrane unit,установка обратного осмоса;RO-модуль,exchanger
+ion_exchange_column,ионообменная колонна,ion exchange column,сорбционная колонна,exchanger
+heat_exchanger,теплообменник,heat exchanger,,exchanger
+scrubber,скруббер,scrubber,газопромыватель;абсорбер,exchanger
+electrostatic_precipitator,электрофильтр,electrostatic precipitator,ЭФ,separator
+slurry_pump,шламовый насос,slurry pump,пульпонасос,pump
+injection_well,нагнетательная скважина,injection well,поглощающая скважина,pump
+settling_tank,отстойник,settling tank,,tank
+storage_tank,ёмкость-накопитель,storage tank,бак-накопитель,tank
+mixer,смеситель,mixer,реактор-смеситель;мешалка,tank
+conveyor,конвейер,conveyor,ленточный конвейер,separator
+belt_filter,ленточный фильтр,belt filter,ленточный вакуум-фильтр,separator
+spray_dryer,распылительная сушилка,spray dryer,,exchanger
+electrode,электрод,electrode,анод;катод,cell
+anode,анод,anode,растворимый анод,cell
+cathode,катод,cathode,катодная основа,cell
+launder,желоб,launder,разливочный желоб,separator

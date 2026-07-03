@@ -1,0 +1,71 @@
+# materials.csv — справочник МАТЕРИАЛОВ (ARCHITECTURE.md §3.2, узел Material).
+# КУРИРОВАННЫЙ СТАРТОВЫЙ набор горно-металлургического домена Норникеля.
+# ЗАМЕНИТЬ файлами кейса — формат тот же (README_DB-стиль).
+# Колонки согласованы с CanonEntity и схемой узла Material (§3.2):
+#   canonical_id — стабильный ключ (KEY_PROPERTY.Material = canonical_id, §3.4)
+#   name_ru, name_en — канонические имена; en-алиасы дозаполняет load_references из глоссария
+#   aliases — синонимы/сокращения через ';' ВНУТРИ ячейки (§4.4)
+#   category — классификатор материала (metal/pgm/intermediate/reagent/byproduct/gas/salt/ion/precursor)
+canonical_id,name_ru,name_en,aliases,category
+nickel,никель,nickel,Ni;никеля;никелевый;катодный никель,metal
+copper,медь,copper,Cu;меди;медный;черновая медь;катодная медь,metal
+cobalt,кобальт,cobalt,Co;кобальта;кобальтовый,metal
+iron,железо,iron,Fe;железа,metal
+sulfur,сера,sulfur,S;серы;элементная сера,nonmetal
+selenium,селен,selenium,Se;селена,metal
+tellurium,теллур,tellurium,Te;теллура,metal
+platinum,платина,platinum,Pt;платины,pgm
+palladium,палладий,palladium,Pd;палладия,pgm
+rhodium,родий,rhodium,Rh;родия,pgm
+ruthenium,рутений,ruthenium,Ru;рутения,pgm
+iridium,иридий,iridium,Ir;иридия,pgm
+osmium,осмий,osmium,Os;осмия,pgm
+pgm,металлы платиновой группы,platinum group metals,МПГ;платиноиды;ЭПГ;платиновые металлы,pgm
+gold,золото,gold,Au;золота,precious
+silver,серебро,silver,Ag;серебра,precious
+nickel_ore,никелевая руда,nickel ore,сульфидная никелевая руда;медно-никелевая руда,ore
+copper_ore,медная руда,copper ore,сульфидная медная руда,ore
+pentlandite,пентландит,pentlandite,,ore
+chalcopyrite,халькопирит,chalcopyrite,,ore
+pyrrhotite,пирротин,pyrrhotite,,ore
+nickel_concentrate,никелевый концентрат,nickel concentrate,,concentrate
+copper_concentrate,медный концентрат,copper concentrate,,concentrate
+pgm_concentrate,концентрат мпг,PGM concentrate,платиновый концентрат,concentrate
+matte,штейн,matte,медно-никелевый штейн;штейна,intermediate
+converter_matte,файнштейн,converter matte,white metal;белый штейн;файнштейна,intermediate
+slag,шлак,slag,шлака;конвертерный шлак;отвальный шлак,byproduct
+dump_slag,отвальный шлак,dump slag,,byproduct
+copper_cake,медный кек,copper cake,,intermediate
+nickel_powder,никелевый порошок,nickel powder,карбонильный никель,product
+nickel_cathode,никелевый катод,nickel cathode,катодный никель,product
+copper_cathode,медный катод,copper cathode,катодная медь,product
+catholyte,католит,catholyte,католита,solution
+anolyte,анолит,anolyte,анолита,solution
+electrolyte,электролит,electrolyte,электролита,solution
+sulfuric_acid,серная кислота,sulfuric acid,H2SO4,reagent
+hydrochloric_acid,соляная кислота,hydrochloric acid,HCl,reagent
+chlorine,хлор,chlorine,Cl2,reagent
+lime,известь,lime,CaO;гашёная известь,reagent
+xanthate,ксантогенат,xanthate,бутиловый ксантогенат;собиратель,reagent
+frother,вспениватель,frother,пенообразователь,reagent
+flocculant,флокулянт,flocculant,,reagent
+sulfates,сульфаты,sulfates,сульфат;SO4;сульфат-ион,ion
+chlorides,хлориды,chlorides,хлорид;Cl-ион;хлорид-ион,ion
+calcium,кальций,calcium,Ca,ion
+magnesium,магний,magnesium,Mg,ion
+sodium,натрий,sodium,Na,ion
+sulfur_dioxide,диоксид серы,sulfur dioxide,SO2;сернистый газ;сернистый ангидрид,gas
+oxygen,кислород,oxygen,O2;технический кислород,gas
+gypsum,гипс,gypsum,дигидрат сульфата кальция,salt
+nickel_sulfate,сульфат никеля,nickel sulfate,NiSO4;никель сернокислый,salt
+copper_sulfate,сульфат меди,copper sulfate,CuSO4;медный купорос,salt
+cobalt_sulfate,сульфат кобальта,cobalt sulfate,CoSO4,salt
+nickel_chloride,хлорид никеля,nickel chloride,NiCl2,salt
+sodium_sulfate,сульфат натрия,sodium sulfate,Na2SO4,salt
+ncm_precursor,прекурсор ncm,NCM precursor,NCM-прекурсор;прекурсор катодных материалов;гидроксид NCM,precursor
+nickel_hydroxide,гидроксид никеля,nickel hydroxide,Ni(OH)2,precursor
+cobalt_hydroxide,гидроксид кобальта,cobalt hydroxide,Co(OH)2,precursor
+mine_water,шахтная вода,mine water,шахтные воды;рудничная вода,water
+process_water,технологическая вода,process water,оборотная вода,water
+brine,рассол,brine,высокоминерализованная вода,water
+tailings,хвосты,tailings,хвосты обогащения;хвостохранилище,waste
