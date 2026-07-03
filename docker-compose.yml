@@ -1,0 +1,66 @@
+# docker-compose «Научный клубок» (ARCHITECTURE.md §11).
+# Тот же файл поднимается локально (профиль demo-local) и на Yandex Cloud VM (deploy-cloud).
+# На этом этапе полностью описан сервис БД (neo4j); backend/frontend — по мере готовности
+# соответствующих модулей (см. закомментированные блоки и §11).
+
+services:
+  neo4j:
+    image: neo4j:5.26-community            # LTS, образ запинен (§2)
+    container_name: nornickel-neo4j
+    restart: unless-stopped
+    ports:
+      - "7474:7474"                        # Neo4j Browser (read-only вид для жюри, §11)
+      - "7687:7687"                        # Bolt (драйвер backend)
+    environment:
+      # Пароль берётся из .env (NEO4J_PASSWORD). Логин всегда neo4j (Community).
+      NEO4J_AUTH: "neo4j/${NEO4J_PASSWORD:-neo4jpassword}"
+      # APOC обязателен: graph_search (apoc.path.subgraphAll) и /graph/edit
+      # (apoc.refactor.mergeNodes, apoc.create.*) — §5.2, §6. apoc-core бандлится в образ.
+      NEO4J_PLUGINS: '["apoc"]'
+      NEO4J_dbms_security_procedures_unrestricted: "apoc.*"
+      NEO4J_dbms_security_procedures_allowlist: "apoc.*"
+      # Память (VM 8 ГБ RAM, §11): heap ~2G.
+      NEO4J_server_memory_heap_initial__size: "1G"
+      NEO4J_server_memory_heap_max__size: "2G"
+      NEO4J_server_memory_pagecache_size: "1G"
+    volumes:
+      - neo4j_data:/data                   # граф переживает пересоздание контейнера
+      - neo4j_logs:/logs
+    healthcheck:
+      # HTTP-эндпоинт поднимается последним — надёжный сигнал готовности.
+      test: ["CMD-SHELL", "wget -qO- http://localhost:7474 >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 40s
+
+  # --- backend (§11): FastAPI + uvicorn workers=1. Раскомментировать после появления
+  #     backend/Dockerfile и app/main.py. Схему инициализирует scripts/init_db.py. ---
+  # backend:
+  #   build: ./backend
+  #   container_name: nornickel-backend
+  #   restart: unless-stopped
+  #   depends_on:
+  #     neo4j:
+  #       condition: service_healthy
+  #   env_file: .env
+  #   environment:
+  #     NEO4J_URI: "bolt://neo4j:7687"
+  #   ports:
+  #     - "8000:8000"                      # Swagger /docs для жюри
+
+  # --- frontend (§8, §11): Streamlit — тонкий клиент над REST API. ---
+  # frontend:
+  #   build: ./frontend
+  #   container_name: nornickel-frontend
+  #   restart: unless-stopped
+  #   depends_on:
+  #     - backend
+  #   environment:
+  #     BACKEND_URL: "http://backend:8000"
+  #   ports:
+  #     - "80:80"
+
+volumes:
+  neo4j_data:
+  neo4j_logs:

@@ -1,0 +1,42 @@
+[project]
+name = "nornickel-backend"
+version = "0.1.0"
+description = "«Научный клубок» — карта знаний R&D: FastAPI + Neo4j knowledge graph (ARCHITECTURE.md)"
+authors = [{ name = "NORNICKEL R&D" }]
+readme = "../README.md"
+requires-python = ">=3.11,<4.0"
+dependencies = [
+    # --- Слой данных (§3, §10) ---
+    "neo4j (>=5.26,<6.0)",
+    "pydantic (>=2.5,<3.0)",
+    "pydantic-settings (>=2.1,<3.0)",
+    "python-dotenv (>=1.0)",
+    "pyyaml (>=6.0)",
+    # --- Веб-слой (§6) ---
+    "fastapi (>=0.110)",
+    "uvicorn[standard] (>=0.29)",
+    "httpx (>=0.27)",
+    "python-multipart (>=0.0.9)",
+    # --- Устойчивость извлечения (§4.1): чиним битый JSON LLM ---
+    "json-repair (>=0.25)",
+]
+
+# Зависимости индекс-агента (парсеры документов, §4) и экспорта (§9) добавляются
+# соответствующими модулями; здесь — ядро backend + слой данных.
+
+[tool.poetry]
+packages = [{ include = "app" }]
+
+[tool.poetry.group.dev.dependencies]
+pytest = ">=7.4"
+
+[build-system]
+requires = ["poetry-core>=2.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+markers = [
+    "integration: требует живой Neo4j 5.26 с APOC (переменная NEO4J_TEST=1)",
+]
