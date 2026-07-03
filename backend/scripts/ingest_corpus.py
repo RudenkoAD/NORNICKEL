@@ -24,6 +24,7 @@ import argparse
 import asyncio
 import json
 import logging
+import math
 import sys
 import time
 import uuid
@@ -35,6 +36,7 @@ from typing import Any, Optional
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.config import get_settings  # noqa: E402
+from app.db import queries as queries_mod  # noqa: E402
 from app.db.neo4j_client import Neo4jClient  # noqa: E402
 from app.ingest import canonizer as canonizer_mod  # noqa: E402
 from app.ingest import chunker as chunker_mod  # noqa: E402
@@ -60,6 +62,14 @@ METADATA_HEAD_CHARS = 4000
 # ---------------------------------------------------------------------------
 # Обработка одного документа (весь конвейер §4)
 # ---------------------------------------------------------------------------
+# Сторож этапа экстракции: базовый бюджет + на каждую КОНКУРЕНТНУЮ ГРУППУ чанков
+# (04.07). Группа из CHUNK_BATCH_SIZE идёт параллельно, каждый чанк ~40-60с у
+# сильной модели; берём 90с/группа с запасом на ретраи. Документ на 40 чанков →
+# 300 + 10 групп × 90 = 1200с вместо фиксированных 600 (терявших такие документы).
+_EXTRACT_BASE_TIMEOUT_S = 300.0
+_EXTRACT_PER_GROUP_S = 90.0
+
+
 async def process_document(
     path: Path,
     *,
@@ -69,11 +79,13 @@ async def process_document(
     client: Optional[Neo4jClient],
     dry_run: bool,
     force: bool = False,
+    doc_timeout: float = 600.0,
 ) -> dict[str, Any]:
     """Прогоняет один файл через весь конвейер §4. Возвращает per-doc отчёт.
 
-    Ошибку НЕ подавляет здесь — её ловит и логирует вызывающий (семафорная обёртка),
-    чтобы один плохой документ не свалил корпус (§4.1).
+    `doc_timeout` — пол сторожевого таймаута на этап экстракции; фактический бюджет
+    масштабируется от числа чанков (см. _EXTRACT_*). Ошибку НЕ подавляет здесь — её
+    ловит вызывающий (семафорная обёртка), чтобы один документ не свалил корпус (§4.1).
     """
     t0 = time.monotonic()
 
@@ -105,7 +117,10 @@ async def process_document(
     # повторный прогон уже импортированного документа зря жёг экстракцию и эмбеддинги
     # (это всплыло на добивке упавших: 429-фейл документа, который уже в графе).
     if client is not None and not force:
-        row = client.read(
+        # to_thread: драйвер Neo4j синхронный (04.07) — прямой вызов из async заморозил
+        # бы event loop, схлопнув конкурентность документов и сторожевые таймеры.
+        row = await asyncio.to_thread(
+            client.read,
             "MATCH (d:Document {doc_id: $id}) RETURN d.title AS title LIMIT 1",
             {"id": doc_id},
         )
@@ -146,9 +161,15 @@ async def process_document(
     # [3] chunker: ~3500 токенов, overlap 300, по абзацам.
     chunks = chunker_mod.chunk_text(parsed.text)
 
-    # [4] extractor: LLM-проход по чанкам ОДНОГО документа последовательно
-    #     (known_entities накапливаются внутри extract_document).
-    chunk_results, extract_stats = await extractor_mod.extract_document(llm, chunks)
+    # [4] extractor: LLM-проход по чанкам группами (extractor.CHUNK_BATCH_SIZE).
+    # Сторож на ЭТОМ этапе, масштабированный от числа чанков (04.07): именно здесь
+    # LLM-вызовы могут зависнуть (обрыв сети / медленная модель), а бюджет должен
+    # расти с размером документа, иначе богатые PDF теряются целиком.
+    n_groups = max(1, math.ceil(len(chunks) / extractor_mod.CHUNK_BATCH_SIZE))
+    extract_budget = max(doc_timeout, _EXTRACT_BASE_TIMEOUT_S + n_groups * _EXTRACT_PER_GROUP_S)
+    chunk_results, extract_stats = await asyncio.wait_for(
+        extractor_mod.extract_document(llm, chunks), timeout=extract_budget
+    )
 
     # [8] merger: dedup сущностей, отбрасывание висячих relations, summary документа.
     merged = merger_mod.merge_document(chunk_results, chunks)
@@ -165,6 +186,11 @@ async def process_document(
         validator_mod.validate_relation(rel, ctext, registry, doc_text=doc_text)
         validator_mod.validate_endpoints(rel, entity_types)
         validator_mod.attach_interval(rel, registry)  # §3.1: интервал на ребро считает код
+        # Регистрация нераспознанной единицы для алерта unknown_units (§4.3): без этого
+        # отчёт всегда пуст. unit_raw есть, но её нет в whitelist → фоллбек-контур.
+        u = rel.get("unit_raw")
+        if u and str(u).strip() and not registry.is_known(str(u)):
+            registry.register_unknown(str(u), rel.get("quote") or "", doc_id)
     # Детектор смешения контекстов прогонов (03.07): разные значения одного параметра
     # на общем Material/Process в одном документе → needs_review всей группы.
     validator_mod.flag_context_ambiguity(merged.get("relations") or [], entity_types)
@@ -210,7 +236,11 @@ async def process_document(
     doc_meta["embedding"] = doc_embedding
 
     # [10] writer: идемпотентная транзакционная запись (§4.5). Канонизация — внутри writer.
-    write_report = writer_mod.write_document(
+    # to_thread: синхронный драйвер Neo4j (сотни statements с 256-d embedding — единицы
+    # секунд блокирующего I/O); прямой вызов из async заморозил бы loop всех соседних
+    # документов и их сторожевые wait_for-таймеры (04.07, adversarial review).
+    write_report = await asyncio.to_thread(
+        writer_mod.write_document,
         client=client,
         doc_meta=doc_meta,
         merged=merged,
@@ -349,21 +379,21 @@ async def run_ingest(
     async def guarded(path: Path) -> None:
         async with sem:
             try:
-                # Сторожевой таймаут на ДОКУМЕНТ ЦЕЛИКОМ (03.07): обрыв сети оставил
-                # await висеть 4.5 часа несмотря на пер-вызовные таймауты (мёртвый
-                # сокет без RST). Никакое зависание не должно останавливать корпус —
-                # документ падает с TimeoutError, конвейер продолжает (инвариант №9).
-                rep = await asyncio.wait_for(
-                    process_document(
-                        path,
-                        llm=llm,
-                        canonizer=canonizer,
-                        registry=registry,
-                        client=client,
-                        dry_run=dry_run,
-                        force=force,
-                    ),
-                    timeout=doc_timeout,
+                # Сторожевой таймаут МАСШТАБИРУЕТСЯ от размера документа (04.07,
+                # adversarial review): фиксированные 600с меньше времени экстракции
+                # больших PDF (выпуск журнала = десятки чанков × 40-60с) → богатейшие
+                # документы терялись целиком. process_document получает own_timeout и
+                # ставит сторож на ЭТАП ЭКСТРАКЦИИ (где реально зависает), зная n_chunks.
+                # Обрыв сети (03.07): пер-вызовные таймауты + этот сторож (мёртвый сокет).
+                rep = await process_document(
+                    path,
+                    llm=llm,
+                    canonizer=canonizer,
+                    registry=registry,
+                    client=client,
+                    dry_run=dry_run,
+                    force=force,
+                    doc_timeout=doc_timeout,
                 )
                 doc_reports.append(rep)
                 log.info(
@@ -383,6 +413,16 @@ async def run_ingest(
         await asyncio.gather(*(guarded(p) for p in files))
         # unknown_units-алерт с LLM-черновиками (§4.3) — после прогона корпуса.
         unknown_units = await draft_unknown_unit_rules(llm, registry)
+        # Разовая очистка осиротевших unresolved-узлов (§4.5, 04.07): вынесена из
+        # per-document cleanup (полный скан на документ = O(N²) + гонка при
+        # параллельной записи). Здесь запись уже завершена — безопасно.
+        if client is not None and not dry_run:
+            removed = await asyncio.to_thread(
+                client.write, queries_mod.ORPHAN_UNRESOLVED_CLEANUP
+            )
+            n = removed[0]["removed"] if removed else 0
+            if n:
+                log.info("Очистка осиротевших unresolved-узлов: удалено %d", n)
     finally:
         if client is not None:
             client.close()
@@ -481,7 +521,7 @@ def main() -> int:
     ap.add_argument("--llm-timeout", type=float, default=None,
                     help="таймаут LLM, сек (второй проход qwen: 300)")
     ap.add_argument("--doc-timeout", type=float, default=600.0,
-                    help="сторожевой таймаут на документ целиком, сек (03.07)")
+                    help="пол сторожевого таймаута экстракции, сек; фактический масштабируется от числа чанков (04.07)")
     args = ap.parse_args()
 
     if not args.corpus.exists():

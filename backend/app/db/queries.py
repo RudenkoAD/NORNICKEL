@@ -680,12 +680,21 @@ def cleanup_document_statements() -> list[str]:
     # Фактические рёбра LLM + служебные MENTIONED_IN/AUTHORED — по провенансу.
     for rel in list(FACT_RELS) + [Rel.MENTIONED_IN, Rel.AUTHORED]:
         stmts.append(f"MATCH ()-[r:{rel} {{source_doc_id: $doc_id}}]-() DELETE r")
-    # Осиротевшие unresolved-узлы без единого MENTIONED_IN (§4.5, опционально).
-    stmts.append(
-        "MATCH (n) WHERE n.unresolved = true "
-        f"AND NOT (n)-[:{Rel.MENTIONED_IN}]->(:{Node.DOCUMENT}) DETACH DELETE n"
-    )
+    # Очистка осиротевших unresolved-узлов вынесена из per-document (04.07,
+    # adversarial review): глобальный «MATCH (n) WHERE n.unresolved» на КАЖДЫЙ документ
+    # (а) полный скан графа → O(N²) на корпусе 1500 док, (б) при параллельной записи
+    # (asyncio.to_thread) рискует удалить unresolved-узлы соседней транзакции.
+    # Теперь — разовый пост-проход ORPHAN_UNRESOLVED_CLEANUP после импорта корпуса.
     return stmts
+
+
+# Разовая очистка осиротевших unresolved-узлов (§4.5): после ПОЛНОГО прогона корпуса,
+# когда все MENTIONED_IN уже проставлены. Безопасен вне конкурентной записи.
+ORPHAN_UNRESOLVED_CLEANUP = (
+    "MATCH (n) WHERE n.unresolved = true "
+    f"AND NOT (n)-[:{Rel.MENTIONED_IN}]->(:{Node.DOCUMENT}) DETACH DELETE n "
+    "RETURN count(n) AS removed"
+)
 
 
 # ---------------------------------------------------------------------------

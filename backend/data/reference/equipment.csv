@@ -13,7 +13,7 @@ tube_furnace,трубчатая печь,tube furnace,трубчатая вра�
 converter,конвертер,converter,горизонтальный конвертер;конвертер Пирса-Смита;конвертер Пирса‑Смита;Peirce-Smith converter,furnace
 anode_furnace,анодная печь,anode furnace,,furnace
 roasting_furnace,обжиговая печь,roasting furnace,печь кипящего слоя,furnace
-electrolysis_cell,ванна электролиза,electrolysis cell,электролизная ванна;электролизёр,cell
+electrolysis_cell,ванна электролиза,electrolysis cell,электролизная ванна,cell
 diaphragm_cell,диафрагменная ячейка,diaphragm cell,диафрагменный электролизёр,cell
 electrowinning_cell,ванна электроэкстракции,electrowinning cell,ячейка электроэкстракции,cell
 electrolyzer,электролизёр,electrolyzer,электролизная установка,cell
@@ -44,7 +44,7 @@ mixer,смеситель,mixer,реактор-смеситель;мешалка,
 conveyor,конвейер,conveyor,ленточный конвейер,separator
 belt_filter,ленточный фильтр,belt filter,ленточный вакуум-фильтр,separator
 spray_dryer,распылительная сушилка,spray dryer,,exchanger
-electrode,электрод,electrode,анод;катод,cell
+electrode,электрод,electrode,,cell
 anode,анод,anode,растворимый анод,cell
 cathode,катод,cathode,катодная основа,cell
 launder,желоб,launder,разливочный желоб,separator

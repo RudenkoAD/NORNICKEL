@@ -267,11 +267,13 @@ def test_lookup_matches_dictionary_via_lemma(canon):
 
 
 def test_resolve_lemma_hits_dictionary_alias(canon):
-    """«катодного никеля» через лемму «катодный никель» попадает в алиас справочного
-    никеля — резолв в канонический узел, а не в заглушку (это и есть цель §4.4)."""
+    """«катодного никеля» через лемму «катодный никель» резолвится в СПРАВОЧНЫЙ узел
+    (не заглушку). 04.07: «катодный никель» — алиас продукта nickel_cathode, а НЕ
+    металла nickel (коллизия исправлена adversarial review); проверяем лишь, что
+    попадание словарное и в продукт-катод, а не в сырьё."""
     ent = canon.resolve("катодного никеля", "Material")
     assert ent.unresolved is False
-    assert ent.canonical_id == "nickel"
+    assert ent.canonical_id == "nickel_cathode"
 
 
 def test_resolve_stub_uses_lemma(canon):

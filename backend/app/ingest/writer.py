@@ -191,9 +191,12 @@ def write_document(
         from_ce = _resolve_end(rel.get("from"), rel.get("from_type"), canon_by_name)
         to_ce = _resolve_end(rel.get("to"), rel.get("to_type"), canon_by_name)
         if from_ce is not None and to_ce is not None:
+            # Ключ дедупа включает ЕДИНИЦУ и ОПЕРАТОР (04.07): без них «≥90 %» и
+            # «≤90 г/т» на одной паре схлопнулись бы в одно ребро — потеря измерения.
             rel_key = (
                 from_ce.canonical_id, rel.get("type"), to_ce.canonical_id,
-                str(rel.get("value_raw")), str(rel.get("value_text")),
+                str(rel.get("value_raw")), str(rel.get("unit_raw")),
+                str(rel.get("operator_raw")), str(rel.get("value_text")),
             )
             if rel_key in seen_rel_keys:
                 deduped_relations += 1

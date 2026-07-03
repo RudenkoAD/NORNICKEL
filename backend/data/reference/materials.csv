@@ -7,8 +7,8 @@
 #   aliases — синонимы/сокращения через ';' ВНУТРИ ячейки (§4.4)
 #   category — классификатор материала (metal/pgm/intermediate/reagent/byproduct/gas/salt/ion/precursor)
 canonical_id,name_ru,name_en,aliases,category
-nickel,никель,nickel,Ni;никеля;никелевый;катодный никель,metal
-copper,медь,copper,Cu;меди;медный;черновая медь;катодная медь,metal
+nickel,никель,nickel,Ni;никеля;никелевый,metal
+copper,медь,copper,Cu;меди;медный;черновая медь,metal
 cobalt,кобальт,cobalt,Co;кобальта;кобальтовый,metal
 iron,железо,iron,Fe;железа,metal
 sulfur,сера,sulfur,S;серы;элементная сера,nonmetal
@@ -33,7 +33,7 @@ copper_concentrate,медный концентрат,copper concentrate,,concent
 pgm_concentrate,концентрат мпг,PGM concentrate,платиновый концентрат,concentrate
 matte,штейн,matte,медно-никелевый штейн;штейна,intermediate
 converter_matte,файнштейн,converter matte,white metal;белый штейн;файнштейна,intermediate
-slag,шлак,slag,шлака;конвертерный шлак;отвальный шлак,byproduct
+slag,шлак,slag,шлака;конвертерный шлак,byproduct
 dump_slag,отвальный шлак,dump slag,,byproduct
 copper_cake,медный кек,copper cake,,intermediate
 nickel_powder,никелевый порошок,nickel powder,карбонильный никель,product

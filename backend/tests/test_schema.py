@@ -93,6 +93,15 @@ def test_cleanup_document_statements_order_and_provenance() -> None:
     assert "Claim" in stmts[1] and "DETACH DELETE" in stmts[1]
     assert any("MENTIONED_IN {source_doc_id: $doc_id}" in s for s in stmts)
     assert any("AUTHORED {source_doc_id: $doc_id}" in s for s in stmts)
-    # Все statements кроме последнего (очистка осиротевших unresolved-узлов) — по $doc_id.
-    assert all("$doc_id" in s for s in stmts[:-1])
-    assert "unresolved" in stmts[-1] and "$doc_id" not in stmts[-1]
+    # 04.07: ВСЕ per-document statements строго по $doc_id — глобальная очистка
+    # осиротевших unresolved вынесена в разовый ORPHAN_UNRESOLVED_CLEANUP
+    # (полный скан на документ = O(N²) + гонка при параллельной записи).
+    assert all("$doc_id" in s for s in stmts)
+    assert not any("unresolved" in s for s in stmts)
+
+
+def test_orphan_unresolved_cleanup_is_global_and_safe() -> None:
+    """Разовая очистка сирот — глобальная (без $doc_id), возвращает счётчик."""
+    assert "$doc_id" not in q.ORPHAN_UNRESOLVED_CLEANUP
+    assert "unresolved" in q.ORPHAN_UNRESOLVED_CLEANUP
+    assert "count(n)" in q.ORPHAN_UNRESOLVED_CLEANUP

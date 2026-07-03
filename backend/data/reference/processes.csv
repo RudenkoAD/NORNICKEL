@@ -12,7 +12,7 @@ electrorefining,электрорафинирование,electrorefining,эле�
 electrolysis,электролиз,electrolysis,электролитическое разделение,hydro
 heap_leaching,кучное выщелачивание,heap leaching,кучное выщелачивание руды,hydro
 tank_leaching,чановое выщелачивание,tank leaching,агитационное выщелачивание,hydro
-pressure_leaching,автоклавное выщелачивание,pressure leaching,POX;окислительное автоклавное выщелачивание;автоклавное окисление,hydro
+pressure_leaching,автоклавное выщелачивание,pressure leaching,POX;окислительное автоклавное выщелачивание,hydro
 atmospheric_leaching,атмосферное выщелачивание,atmospheric leaching,выщелачивание при атмосферном давлении,hydro
 chlorination,хлорирование,chlorination,хлорное выщелачивание;солянокислотное выщелачивание,hydro
 cementation,цементация,cementation,контактное осаждение,hydro

@@ -268,16 +268,18 @@ def flag_context_ambiguity(relations: list[dict], entity_types: dict[str, str]) 
             continue
         if entity_types.get(rel.get("from")) not in ("Material", "Process"):
             continue
+        # Только ЧИСЛОВЫЕ измерения (04.07): категориальные value_text-условия
+        # («холодный климат» + «арктика» на одном процессе) — легитимно разные,
+        # не смешение прогонов; их карантинить нельзя.
+        if rel.get("value_raw") is None or not str(rel.get("value_raw")).strip():
+            continue
         key = (_normalize_ws(str(rel.get("from") or "")).lower(),
                _normalize_ws(str(rel.get("to") or "")).lower())
         groups.setdefault(key, []).append(rel)
 
     flagged = 0
     for (_frm, _to), rels in groups.items():
-        values = {
-            (str(r.get("value_raw")), str(r.get("value_text")))
-            for r in rels
-        }
+        values = {str(r.get("value_raw")) for r in rels}
         if len(rels) < 2 or len(values) < 2:
             continue
         for r in rels:

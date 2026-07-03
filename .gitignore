@@ -13,3 +13,4 @@ processed_corpus
 __pycache__/
 *.pyc
 .pytest_cache/
+backend/logs/

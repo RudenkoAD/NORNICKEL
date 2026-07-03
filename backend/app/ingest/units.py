@@ -296,6 +296,15 @@ class UnitRegistry:
         """
         operator = (operator_raw or "").strip().lower()
 
+        # category не передана явно (импорт: attach_interval/repair_units/resolve_review
+        # без справочного контекста, 04.07) → выводим из единицы: «°C» → temperature.
+        # Нужно для оператора «~» при v==0 (abs-дельта категории, §3.1) — иначе все
+        # факты «около 0» уходили бы в needs_review вместо интервала [−δ, +δ].
+        if category is None and unit_raw and str(unit_raw).strip():
+            spec = self._lookup_spec(str(unit_raw))
+            if spec is not None:
+                category = spec.get("category")
+
         # 1) Границы интервала В СЫРЫХ значениях по оператору (§3.1, таблица).
         raw = self._interval_raw(value_raw, operator, category)
         if raw is None:
