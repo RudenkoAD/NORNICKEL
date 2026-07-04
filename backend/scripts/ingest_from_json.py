@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import signal
 import sys
 import time
 import uuid
@@ -88,7 +89,13 @@ def process_one(path: Path, client: Neo4jClient, canonizer: Any, registry: Any,
 
     # Детерминированный ре-парс: content_hash (идемпотентность §4.5) + текст для
     # валидации quote. LLM-часть уже сделана Haiku — сюда не входит.
-    parsed = parser_mod.parse_file(src)
+    # SIGALRM-сторож: find_tables намертво виснет на отдельных журналах ЦМ
+    # (без него один документ останавливает всю партию).
+    signal.alarm(120)
+    try:
+        parsed = parser_mod.parse_file(src)
+    finally:
+        signal.alarm(0)
     doc_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"nornickel:doc:{parsed.content_hash}"))
 
     if not force:
@@ -165,12 +172,24 @@ def main() -> int:
     ap.add_argument("--force", action="store_true")
     args = ap.parse_args()
 
-    files = sorted(args.json_dir.glob("*.json"))
+    def _alarm(_sig: int, _frame: Any) -> None:
+        raise TimeoutError("parse_file hung")
+
+    signal.signal(signal.SIGALRM, _alarm)
+
+    # Леджер обработанных JSON: hash-skip требует ре-парса PDF (дорого на 1000+
+    # доков), поэтому повторные прогоны пропускают уже залитые файлы по имени.
+    ledger_path = args.json_dir / ".ingested.txt"
+    ingested: set[str] = set()
+    if ledger_path.exists() and not args.force:
+        ingested = set(ledger_path.read_text(encoding="utf-8").split())
+
+    files = sorted(p for p in args.json_dir.glob("*.json") if p.name not in ingested)
     if args.limit:
         files = files[: args.limit]
     if not files:
-        print(f"Нет JSON в {args.json_dir}", file=sys.stderr)
-        return 1
+        print(f"Нет новых JSON в {args.json_dir}", file=sys.stderr)
+        return 0
 
     client = Neo4jClient(get_settings())
     if not client.wait_until_ready(timeout_s=30):
@@ -188,10 +207,13 @@ def main() -> int:
         except Exception as err:  # noqa: BLE001 — один JSON не валит партию
             rep = {"json": path.name, "status": "error", "error": repr(err)[:120]}
         counts[rep["status"]] = counts.get(rep["status"], 0) + 1
+        if rep["status"] in ("written", "skipped_hash"):
+            with ledger_path.open("a", encoding="utf-8") as lf:
+                lf.write(path.name + "\n")
         if rep["status"] == "written":
             written += 1
             if written % 25 == 0:
-                print(f"  …{written} записано ({time.monotonic()-t0:.0f}s)")
+                print(f"  …{written} записано ({time.monotonic()-t0:.0f}s)", flush=True)
         elif rep["status"] not in ("skipped_hash",):
             print(f"  {rep['status']}: {rep['json']} {rep.get('error','')}", file=sys.stderr)
 
