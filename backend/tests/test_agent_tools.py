@@ -17,6 +17,7 @@ import time
 
 import pytest
 
+from app.agent import orchestrator as orchestrator_mod
 from app.agent import planner as planner_mod
 from app.agent.filter_cache import FilterCache
 from app.agent.result_cache import ResultCache
@@ -191,6 +192,124 @@ def test_cite_key_missing_author_or_year(fn):
     assert fn([], 2020) == "Без автора 2020"
     assert fn(["Иванов"], None) == "Иванов б.г."
     assert fn(None, None) == "Без автора б.г."
+
+
+# --------------------------------------------------------------------------- #
+# out_of_scope-гибрид (04.07): эвристика болтовни + шаблонная ветка (офлайн, без LLM/БД)
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize("text", [
+    "привет", "Привет!", "Здравствуйте", "добрый день", "Доброе утро!",
+    "спасибо", "Спасибо большое, вы мне очень помогли, всего доброго!",
+    "пока", "до свидания", "hi", "Hello!", "thanks",
+])
+def test_is_smalltalk_greetings_and_thanks(text):
+    """Приветствия/благодарности/прощания → детерминированный шаблон без LLM."""
+    assert orchestrator_mod._is_smalltalk(text) is True
+
+
+@pytest.mark.parametrize("text", [
+    "что ты умеешь?",
+    "что ты умеешь",           # вопросное слово важнее отсутствия «?»
+    "can you help?",
+    "how does this work",
+    "расскажи о себе",
+    "помоги разобраться с корпусом документов",
+    "привет, а что ты умеешь?",  # приветствие + вопрос → вопрос главнее
+    "загрузи пожалуйста мой новый документ — отчёт по обеднению шлака за 2024 год",
+])
+def test_is_smalltalk_real_questions_go_to_llm(text):
+    """Реальные вопросы/просьбы в out_of_scope остаются на LLM-пути (гибрид)."""
+    assert orchestrator_mod._is_smalltalk(text) is False
+
+
+def test_smalltalk_answer_has_examples_and_no_service_noise():
+    """Шаблон: примеры реальных вопросов есть; эндпоинтов и «не найдено» — нет."""
+    a = orchestrator_mod._SMALLTALK_ANSWER
+    assert "плавку медно-никелевых концентратов" in a
+    assert "обессоливания воды" in a
+    low = a.lower()
+    assert "post" not in low and "/documents" not in low and "эндпоинт" not in low
+    assert "не найдено" not in low
+
+
+def test_answer_stream_smalltalk_template_contract(monkeypatch):
+    """Шаблонная ветка: plan → token(один) → citations → subgraph → done, кэш заполнен (§6).
+
+    LLM не должна вызываться ВООБЩЕ: YandexLLM подменён пустышкой без chat_text —
+    любой вызов уронил бы поток в error, и порядок событий бы не сошёлся.
+    """
+    async def fake_plan(llm, question, canonizer=None, units=None, model=None):
+        return {"intent": "out_of_scope", "filters": {}}
+
+    monkeypatch.setattr(orchestrator_mod.planner_mod, "plan", fake_plan)
+    monkeypatch.setattr(orchestrator_mod, "YandexLLM", lambda: object())
+    monkeypatch.setattr(orchestrator_mod, "_canonizer", lambda: object())
+    monkeypatch.setattr(orchestrator_mod, "_units", lambda: object())
+
+    async def _collect():
+        return [ev async for ev in orchestrator_mod.answer_stream("привет", "researcher")]
+
+    events = asyncio.run(_collect())
+    names = [e["event"] for e in events]
+    assert names == ["plan", "token", "citations", "subgraph", "done"]
+    token = next(e for e in events if e["event"] == "token")
+    assert token["data"] == orchestrator_mod._SMALLTALK_ANSWER
+    cached = orchestrator_mod.get_result_cache().get(events[-1]["data"]["query_id"])
+    assert cached is not None
+    assert cached["answer_md"] == orchestrator_mod._SMALLTALK_ANSWER
+    assert cached["citations"] == []
+
+
+def test_answer_stream_out_of_scope_question_uses_llm_path(monkeypatch):
+    """«что ты умеешь?» в out_of_scope → LLM-путь (_synthesize), контракт §6 сохранён."""
+    calls: dict[str, object] = {}
+
+    async def fake_plan(llm, question, canonizer=None, units=None, model=None):
+        return {"intent": "out_of_scope", "filters": {}}
+
+    async def fake_synth(llm, question, plan, docs, graph, gaps, strict, citations,
+                         branches=None, out_of_scope=False):
+        calls["out_of_scope"] = out_of_scope
+        return "Я — агент карты знаний. Задайте вопрос по корпусу документов."
+
+    monkeypatch.setattr(orchestrator_mod.planner_mod, "plan", fake_plan)
+    monkeypatch.setattr(orchestrator_mod, "_synthesize", fake_synth)
+    monkeypatch.setattr(orchestrator_mod, "YandexLLM", lambda: object())
+    monkeypatch.setattr(orchestrator_mod, "_canonizer", lambda: object())
+    monkeypatch.setattr(orchestrator_mod, "_units", lambda: object())
+
+    async def _collect():
+        return [ev async for ev in
+                orchestrator_mod.answer_stream("что ты умеешь?", "researcher")]
+
+    events = asyncio.run(_collect())
+    names = [e["event"] for e in events]
+    assert calls["out_of_scope"] is True
+    assert names[0] == "plan" and names[-1] == "done"
+    joined = "".join(e["data"] for e in events if e["event"] == "token")
+    assert joined == "Я — агент карты знаний. Задайте вопрос по корпусу документов."
+
+
+def test_synthesize_out_of_scope_prompt_bans_service_noise():
+    """Служебный блок out_of_scope: POST /documents убран, запреты на отчёты о поиске
+    и API-эндпоинты прописаны явно (причина: конфуз модели на «привет»)."""
+    captured: dict[str, str] = {}
+
+    class FakeLLM:
+        async def chat_text(self, system, user, model=None, temperature=0.0):
+            captured["user"] = user
+            return "ok"
+
+    asyncio.run(orchestrator_mod._synthesize(
+        FakeLLM(), "что ты умеешь?", {"intent": "out_of_scope"},
+        docs=[], graph={"stats": [], "edges": [], "experts": [], "citations": []},
+        gaps=[], strict=None, citations=[], out_of_scope=True,
+    ))
+    user = captured["user"]
+    assert "POST /documents" not in user
+    assert "API-эндпоинты" in user      # запрет упоминания эндпоинтов — явный
+    assert "не найдено" in user         # фраза фигурирует ТОЛЬКО как запрет
+    assert "1-3 предложения" in user
 
 
 # --------------------------------------------------------------------------- #

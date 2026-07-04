@@ -21,6 +21,11 @@ result_cache по query_id (§6).
 Стриминг апстрима у Yandex chat в этом клиенте не реализован (§llm/yandex): синтез
 получаем chat_text ЦЕЛИКОМ и стримим псевдо-токенами по предложениям (honest-компромисс).
 TODO: SSE-стриминг апстрима (заменить chat_text на стрим-эндпоинт, когда появится).
+
+out_of_scope — гибрид (04.07): чистая болтовня («привет», «спасибо») отсекается
+эвристикой _is_smalltalk и получает детерминированный шаблон БЕЗ LLM; реальные
+вопросы вне корпуса («что ты умеешь?») идут через _synthesize(out_of_scope=True).
+Порядок SSE-событий и result_cache в обеих ветках — как в обычном пути (§6).
 """
 
 from __future__ import annotations
@@ -51,6 +56,70 @@ _DEPTH = {"search": 2, "review": 4, "compare": 2, "gaps": 2, "out_of_scope": 0}
 
 # Разбивка синтеза на псевдо-токены по границам предложений (§задание: honest-компромисс).
 _SENTENCE_SPLIT = re.compile(r"(?<=[.!?\n])\s+")
+
+
+# --- Болтовня в out_of_scope: детерминированный шаблон БЕЗ LLM (гибрид, 04.07) ---
+# Почему кодом, а не LLM: синтез на пустом контексте путался — на «привет» отчитывался
+# «релевантных источников не найдено» и советовал несуществующий эндпоинт. Приветствию
+# LLM не нужна вовсе; реальные вопросы («что ты умеешь?») остаются на LLM-пути.
+
+# Однословные маркеры болтовни — сверяем ПО ЦЕЛЫМ СЛОВАМ (иначе «пока» ловит «показатели»).
+_SMALLTALK_WORDS = frozenset({
+    "привет", "приветствую", "здравствуй", "здравствуйте", "спасибо", "благодарю",
+    "пока", "хай", "салют", "ку", "здорово",
+    "hi", "hello", "hey", "thanks", "thx", "bye", "goodbye",
+})
+# Многословные маркеры — по подстроке (после lower()).
+_SMALLTALK_PHRASES = (
+    "добрый день", "добрый вечер", "доброе утро", "доброй ночи", "до свидания",
+    "всего доброго", "хорошего дня", "thank you", "good morning", "good evening",
+)
+# Вопросные слова: их наличие = содержательный вопрос → LLM-путь, не шаблон.
+_QUESTION_WORDS = frozenset({
+    "что", "как", "почему", "зачем", "какие", "какой", "какая", "каков", "каковы",
+    "кто", "где", "когда", "сколько", "чем", "можешь", "умеешь", "расскажи",
+    "объясни", "помоги", "покажи", "найди",
+    "help", "what", "how", "why", "which", "who", "when", "where", "can", "could",
+    "tell", "explain", "show", "find",
+})
+# Порог «короткого» сообщения: болтовня редко длиннее, а содержательный запрос без
+# вопросных слов («методы обессоливания воды для обогатительной фабрики») — длиннее.
+_SMALLTALK_MAX_LEN = 40
+
+# Шаблонный ответ на болтовню: дружелюбно, с примерами РЕАЛЬНЫХ вопросов по корпусу.
+# БЕЗ упоминания API-эндпоинтов и БЕЗ «источников не найдено» (причина гибрида выше).
+_SMALLTALK_ANSWER = (
+    "Здравствуйте! Я — агент карты знаний по корпусу научно-технических документов "
+    "горно-металлургической отрасли: отвечаю на вопросы о материалах, процессах, "
+    "оборудовании и экспериментах со ссылками на источники. Спросите, например: "
+    "«При каких температурах ведут плавку медно-никелевых концентратов?» или "
+    "«Какие методы обессоливания воды подходят для обогатительной фабрики?»"
+)
+
+_WORD_RE = re.compile(r"[a-zа-яё]+")
+
+
+def _is_smalltalk(text: str) -> bool:
+    """Чистая ли болтовня (приветствие/благодарность/прощание) — решается кодом, без LLM.
+
+    Консервативно: любой признак вопроса («?», вопросное слово) → НЕ болтовня, ответ
+    отдаст LLM-путь out_of_scope. Вызывается ПОСЛЕ планировщика (intent уже
+    out_of_scope, §5.1), поэтому предметные запросы сюда почти не попадают — эвристика
+    лишь отделяет «привет/спасибо» от «что ты умеешь?».
+    """
+    t = (text or "").strip().lower()
+    if not t:
+        return True
+    if "?" in t:
+        return False
+    words = set(_WORD_RE.findall(t))
+    if words & _QUESTION_WORDS:
+        return False
+    if words & _SMALLTALK_WORDS:
+        return True
+    if any(phrase in t for phrase in _SMALLTALK_PHRASES):
+        return True
+    return len(t) <= _SMALLTALK_MAX_LEN
 
 
 # --- Ленивые процессные синглтоны тяжёлых ассетов (Canonizer грузит справочники ~сек) ---
@@ -205,6 +274,48 @@ def _serialize_context(
         for e in experts:
             lines.append(f"- {e.get('name')} ({e.get('affiliation') or 'аффилиация неизв.'})")
 
+    # Эксперименты и числовые факты подграфа (04.07, тест кейсов №2/№4): без этих
+    # блоков синтез не видел Experiment-узлы и интервалы на рёбрах — «оптимальная
+    # скорость 0,5–0,7 м³/ч» лежала в подграфе, но не попадала в промпт.
+    node_by_key = {n.get("key"): n for n in graph.get("nodes", [])}
+    exp_nodes = [n for n in graph.get("nodes", []) if n.get("label") == "Experiment"]
+    if exp_nodes:
+        lines.append("\nЭКСПЕРИМЕНТЫ (graph_search):")
+        for n in exp_nodes[:8]:
+            p = n.get("props") or {}
+            head = (f"- «{n.get('name')}» ({p.get('year') or 'б.г.'}, "
+                    f"география={p.get('geography') or '?'})")
+            if p.get("summary"):
+                head += f": {str(p['summary'])[:220]}"
+            lines.append(head)
+            shown = 0
+            for e in graph.get("edges", []):
+                if e.get("from") != n.get("key") or shown >= 6:
+                    continue
+                tgt = node_by_key.get(e.get("to")) or {}
+                val = _edge_value_str(e.get("props") or {})
+                lines.append(f"    {e.get('type')} → {tgt.get('name')}{val}")
+                shown += 1
+
+    numeric_edges = []
+    for e in graph.get("edges", []):
+        p = e.get("props") or {}
+        if p.get("needs_review") or p.get("deleted"):
+            continue
+        if p.get("value_min") is None and p.get("value_max") is None and not p.get("value_text"):
+            continue
+        src = node_by_key.get(e.get("from")) or {}
+        tgt = node_by_key.get(e.get("to")) or {}
+        if src.get("label") == "Experiment":
+            continue  # уже показаны в блоке экспериментов
+        if src.get("name") and tgt.get("name"):
+            numeric_edges.append(
+                f"- {src.get('name')} —{e.get('type')}→ {tgt.get('name')}"
+                f"{_edge_value_str(p)}")
+    if numeric_edges:
+        lines.append("\nЧИСЛОВЫЕ ФАКТЫ ПОДГРАФА (проверенные, без needs_review):")
+        lines.extend(numeric_edges[:15])
+
     if gaps:
         lines.append("\nПРОБЕЛЫ (find_gaps — единственный источник пробелов):")
         for g in gaps[:15]:
@@ -228,6 +339,23 @@ def _serialize_context(
                 )
 
     return "\n".join(lines)
+
+
+def _edge_value_str(props: dict[str, Any]) -> str:
+    """Человекочитаемое значение ребра: интервал+единица или категориальный value_text."""
+    vmin, vmax = props.get("value_min"), props.get("value_max")
+    unit = props.get("unit_canon") or props.get("unit_raw") or ""
+    if vmin is not None or vmax is not None:
+        if vmin is not None and vmax is not None:
+            num = f"{vmin:g}" if vmin == vmax else f"{vmin:g}–{vmax:g}"
+        elif vmin is not None:
+            num = f"≥{vmin:g}"
+        else:
+            num = f"≤{vmax:g}"
+        return f" = {num} {unit}".rstrip()
+    if props.get("value_text"):
+        return f" = «{props['value_text']}»"
+    return ""
 
 
 def _citations_block(citations: list[str]) -> str:
@@ -256,6 +384,23 @@ async def _run_search_pipeline(
         role=role,
         top_k=top_k,
     )
+
+    # 04.07 (кейс №1, обессоливание): узкий строгий фильтр душил семантику — план
+    # резолвит «обессоливание» в один узел-процесс (1 док), а родственные методы
+    # (ионный обмен — 11 доков, обратный осмос, водоподготовка) живут на других
+    # canonical_id и в клетку filter_id не попадают. При count<5 добираем
+    # НЕфильтрованной семантикой: строгие результаты первыми, добор — по смыслу.
+    if (strict.get("count") or 0) < 5 and len(docs) < top_k:
+        extra = await semantic_search_tool.run(
+            query_text_ru=plan.get("query_text_ru", ""),
+            query_text_en=plan.get("query_text_en", ""),
+            filter_id=None,
+            role=role,
+            top_k=top_k,
+        )
+        seen = {d.get("doc_id") for d in docs}
+        docs += [d for d in extra if d.get("doc_id") not in seen][
+            : max(0, top_k - len(docs))]
 
     node_keys = _node_keys_from_plan(plan, docs)
     graph = graph_search_tool.run(node_keys, role, depth=depth)
@@ -299,16 +444,27 @@ async def answer_stream(question: str, role: str) -> AsyncIterator[dict]:
 
         intent = plan.get("intent", "search")
 
-        # --- 2. out_of_scope: прямой ответ без инструментов (§5.1) ---
+        # --- 2. out_of_scope: прямой ответ без инструментов (§5.1), гибрид 04.07 ---
         if intent == "out_of_scope":
-            answer_md = await _synthesize(
-                llm, question, plan, docs=[], graph={"stats": [], "edges": [], "experts": [],
-                                                     "citations": []},
-                gaps=[], strict=None, citations=[], out_of_scope=True,
-            )
-            async for tok in _stream_sentences(answer_md):
-                answer_parts.append(tok)
-                yield {"event": "token", "data": tok}
+            if _is_smalltalk(question):
+                # Чистая болтовня («привет», «спасибо») — детерминированный шаблон
+                # БЕЗ вызова LLM (см. комментарий у _SMALLTALK_ANSWER). SSE-контракт
+                # (§6) сохранён: plan уже отдан, tool_result в out_of_scope не было и
+                # раньше; шаблон уходит ОДНИМ token-событием (стримить нечего).
+                answer_parts.append(_SMALLTALK_ANSWER)
+                yield {"event": "token", "data": _SMALLTALK_ANSWER}
+            else:
+                # В out_of_scope попал реальный вопрос («что ты умеешь?») — краткий
+                # LLM-ответ; служебный блок в _synthesize запрещает отчёты о поиске
+                # и упоминание API-эндпоинтов.
+                answer_md = await _synthesize(
+                    llm, question, plan, docs=[],
+                    graph={"stats": [], "edges": [], "experts": [], "citations": []},
+                    gaps=[], strict=None, citations=[], out_of_scope=True,
+                )
+                async for tok in _stream_sentences(answer_md):
+                    answer_parts.append(tok)
+                    yield {"event": "token", "data": tok}
             yield {"event": "citations", "data": []}
             yield {"event": "subgraph", "data": subgraph}
             query_id = _cache_result(question, "".join(answer_parts), [], subgraph)
@@ -411,12 +567,10 @@ async def answer_stream(question: str, role: str) -> AsyncIterator[dict]:
         citations = _merge_citations(docs + branch_docs, graph)
         subgraph = {"nodes": graph.get("nodes", []), "edges": graph.get("edges", [])}
 
-        # --- 5. Синтез (§5.3) — chat_text целиком → псевдо-стрим по предложениям ---
-        answer_md = await _synthesize(
-            llm, question, plan, docs=docs, graph=graph, gaps=gaps, strict=strict,
-            citations=citations, branches=branches,
-        )
-        async for tok in _stream_sentences(answer_md):
+        # --- 5. Синтез (§5.3) — стрим апстрима (04.07): дельты по мере генерации ---
+        async for tok in _synthesize_stream(
+                llm, question, plan, docs=docs, graph=graph, gaps=gaps, strict=strict,
+                citations=citations, branches=branches):
             answer_parts.append(tok)
             yield {"event": "token", "data": tok}
 
@@ -458,10 +612,20 @@ async def _synthesize(
     YandexLLM его поддержит. Пока стримим псевдо-токенами (_stream_sentences).
     """
     if out_of_scope:
+        # 04.07 (гибрид): чистую болтовню сюда уже не пускает _is_smalltalk — здесь
+        # только реальные вопросы вне корпуса («что ты умеешь?»). Прежняя подсказка
+        # про POST /documents убрана: модель советовала пользователю API-эндпоинт,
+        # которого в его интерфейсе нет, и отчитывалась «источников не найдено».
         context_block = (
-            "Вопрос не относится к тематике загруженных документов (болтовня / вне охвата). "
-            "Ответь коротко и вежливо; если это просьба загрузить документ — подскажи, "
-            "что импорт делается через POST /documents. Ссылок [cite_key] не ставь."
+            "Сообщение пользователя не относится к тематике корпуса документов (вне "
+            "охвата). Ответь дружелюбно, 1-3 предложения: скажи, что ты агент карты "
+            "знаний по научно-техническим документам горно-металлургической отрасли "
+            "(материалы, процессы, оборудование, эксперименты), и предложи задать "
+            "вопрос по этой тематике. "
+            "ЗАПРЕЩЕНО: отчитываться об итогах поиска или источниках (фразы вида "
+            "«источников не найдено» — НЕЛЬЗЯ), упоминать любые API-эндпоинты, "
+            "HTTP-методы и URL, ставить ссылки [cite_key], строить разделы "
+            "«Консенсус/Разногласия/Пробелы/Эксперты» из системных правил."
         )
     else:
         context_block = _serialize_context(plan, docs, graph, gaps, strict, branches)
@@ -474,6 +638,43 @@ async def _synthesize(
     from app.agent.prompts import SYNTH_PROMPT
     system = SYNTH_PROMPT.split("ВОПРОС ПОЛЬЗОВАТЕЛЯ:")[0].strip()
     return await llm.chat_text(system=system, user=user, model=_synth_model(), temperature=0.2)
+
+
+async def _synthesize_stream(
+    llm: YandexLLM,
+    question: str,
+    plan: dict[str, Any],
+    docs: list[dict],
+    graph: dict[str, Any],
+    gaps: list[dict],
+    strict: Optional[dict],
+    citations: list[str],
+    branches: Optional[dict[str, Any]] = None,
+) -> AsyncIterator[str]:
+    """Потоковый синтез (04.07): дельты уходят пользователю ПО МЕРЕ генерации.
+
+    Замер: синтез — 91% латентности (~58 с из 63), а без стрима все token-события
+    выстреливали разом в конце. Теперь первые слова — на ~6-8-й секунде. Дельты
+    буферизуются до ~40 символов (или до переноса строки), чтобы не спамить SSE
+    сотнями событий по 2-3 символа. Промпты — те же, что у _synthesize.
+    """
+    context_block = _serialize_context(plan, docs, graph, gaps, strict, branches)
+    user = build_synth_user(
+        question=question,
+        citations_block=_citations_block(citations),
+        context_block=context_block,
+    )
+    from app.agent.prompts import SYNTH_PROMPT
+    system = SYNTH_PROMPT.split("ВОПРОС ПОЛЬЗОВАТЕЛЯ:")[0].strip()
+    buf = ""
+    async for delta in llm.chat_text_stream(
+            system=system, user=user, model=_synth_model(), temperature=0.2):
+        buf += delta
+        if len(buf) >= 40 or "\n" in buf:
+            yield buf
+            buf = ""
+    if buf:
+        yield buf
 
 
 _STREAM_WINDOW = 60  # символов на псевдо-токен

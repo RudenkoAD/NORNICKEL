@@ -172,6 +172,79 @@ class YandexLLM:
                     log.warning("chat_text: попытка %d не удалась (%s), ретрай.", attempt + 1, err)
         raise LLMError(f"LLM chat_text недоступна после ретрая: {last_err}") from last_err
 
+    async def chat_text_stream(
+        self,
+        system: str,
+        user: str,
+        model: Optional[str] = None,
+        temperature: float = 0.0,
+    ):
+        """Потоковый текстовый ответ: async-генератор дельт контента (04.07).
+
+        SSE OpenAI-формата (stream=true): `data: {"choices":[{"delta":{"content":..}}]}`,
+        конец — `data: [DONE]`. Ретрай (один) — только если поток упал ДО первой
+        дельты; после начала выдачи ошибка пробрасывается LLMError (инвариант №9 —
+        не склеиваем два недо-ответа). Yandex-провайдер стрим этого клиента не
+        поддерживает — честный фолбэк: один chunk из chat_text.
+
+        Read-timeout httpx в стриме — пауза МЕЖДУ чанками (не суммарное время),
+        поэтому дефолтных секунд хватает на сколь угодно длинную генерацию.
+        """
+        if self._provider != "openrouter":
+            yield await self.chat_text(system, user, model=model, temperature=temperature)
+            return
+
+        payload = {
+            "model": self._resolve_model(model),
+            "temperature": temperature,
+            "stream": True,
+            # 04.07: без этого Sonnet-5 через OpenRouter молча «думает» ~25 с до
+            # первой контентной дельты (reasoning-дельты не контент) — TTFT рушится.
+            # Синтезу по готовому контексту рассуждения не нужны.
+            "reasoning": {"enabled": False},
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+        }
+        import json as _json
+        last_err: Optional[Exception] = None
+        for attempt in range(2):
+            emitted = False
+            try:
+                async with httpx.AsyncClient(timeout=self._timeout) as client:
+                    async with client.stream(
+                        "POST", f"{self._base_url}/chat/completions",
+                        headers=self._headers(), json=payload,
+                    ) as resp:
+                        if resp.status_code == 429 and attempt == 0:
+                            await asyncio.sleep(3.0)
+                            raise httpx.HTTPStatusError(
+                                "429", request=resp.request, response=resp)
+                        resp.raise_for_status()
+                        async for line in resp.aiter_lines():
+                            if not line.startswith("data:"):
+                                continue
+                            data = line[5:].strip()
+                            if data == "[DONE]":
+                                return
+                            try:
+                                delta = _json.loads(data)["choices"][0]["delta"]
+                            except (KeyError, IndexError, ValueError):
+                                continue  # keep-alive/комментарии роутера
+                            chunk = delta.get("content")
+                            if chunk:
+                                emitted = True
+                                yield chunk
+                return
+            except (httpx.HTTPError, LLMError) as err:
+                if emitted:
+                    raise LLMError(f"стрим синтеза оборвался: {err}") from err
+                last_err = err
+                if attempt == 0:
+                    log.warning("chat_text_stream: попытка не удалась (%s), ретрай.", err)
+        raise LLMError(f"LLM stream недоступна после ретрая: {last_err}") from last_err
+
     async def chat_json(
         self,
         system: str,
