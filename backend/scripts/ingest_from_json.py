@@ -86,6 +86,29 @@ def _sanitize_entities(entities: list) -> tuple[list, int]:
     return keep, dropped
 
 
+# Типы рёбер тоже нормализуем: выдумки Haiku (USES_EQUIPMENT, PROCESSES…) иначе
+# уезжают в граф как есть — writer пишет тип динамически, validator незнакомые
+# типы не проверяет. Алиасы → канон, прочее — отброс со счётчиком.
+_REL_MAP = {
+    "USES_MATERIAL": "USES_MATERIAL", "HAS_CONDITION": "HAS_CONDITION",
+    "PRODUCES": "PRODUCES", "STUDIES": "STUDIES", "EXPERT_IN": "EXPERT_IN",
+    "USED_EQUIPMENT": "USED_EQUIPMENT", "CONTRADICTS": "CONTRADICTS",
+    "USES_EQUIPMENT": "USED_EQUIPMENT", "USED_IN": "USES_MATERIAL",
+}
+
+
+def _sanitize_relations(relations: list) -> tuple[list, int]:
+    keep, dropped = [], 0
+    for r in relations:
+        canon = _REL_MAP.get(str(r.get("type") or "").strip().upper())
+        if canon:
+            r["type"] = canon
+            keep.append(r)
+        else:
+            dropped += 1
+    return keep, dropped
+
+
 def _valid_extraction(data: dict) -> bool:
     return isinstance(data.get("entities"), list) and isinstance(data.get("relations"), list)
 
@@ -163,9 +186,10 @@ def process_one(path: Path, client: Neo4jClient, canonizer: Any, registry: Any,
     # quote по этому тексту.
     chunk = _Chunk(0, parsed.text)
     entities, dropped_types = _sanitize_entities(data.get("entities") or [])
+    relations, dropped_rels = _sanitize_relations(data.get("relations") or [])
     extraction = {
         "entities": entities,
-        "relations": data.get("relations") or [],
+        "relations": relations,
         "claims": data.get("claims") or [],
         "summary": data.get("summary") or "",
     }
@@ -193,7 +217,7 @@ def process_one(path: Path, client: Neo4jClient, canonizer: Any, registry: Any,
         "json": path.name, "status": "written", "doc_id": doc_id,
         "title": doc_meta["title"][:50],
         "entities": len(merged.get("entities") or []),
-        "dropped_types": dropped_types,
+        "dropped_types": dropped_types + dropped_rels,
         "relations": report.get("relations", 0),
         "claims": report.get("claims", 0),
         "needs_review": report.get("needs_review", 0),
