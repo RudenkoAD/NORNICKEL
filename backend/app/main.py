@@ -274,9 +274,12 @@ async def post_documents(
         tmp_path.write_bytes(content)
 
         llm = YandexLLM(settings, timeout_s=max(float(settings.llm_timeout_s), 90.0))
-        canonizer = canonizer_mod.Canonizer()
-        registry = units_mod.UnitRegistry()
         client = get_client()
+        # 04.07 (одна ручка = весь цикл): канонизатор с Neo4j-клиентом — новые
+        # сущности приклеиваются к живым узлам графа (fulltext exact-приёмка §4.4)
+        # вместо порождения дублей «рафинированная медь №2».
+        canonizer = canonizer_mod.Canonizer(neo4j_client=client)
+        registry = units_mod.UnitRegistry()
 
         # process_document сам делает parse→extract→…→write. form-оверрайды access/trust
         # process_document не принимает напрямую — применяем их через monkeypatch-free
@@ -297,6 +300,23 @@ async def post_documents(
             ),
             timeout=600.0,
         )
+
+        # 04.07 (одна ручка = весь цикл): пост-резолв needs_review СРАЗУ, скоупом
+        # по свежему документу — fuzzy-переякорение + LLM-этапы B/C (та же механика,
+        # что прогонялась по корпусу). Ошибка пост-шага НЕ валит импорт: документ уже
+        # в графе, флаги честно остаются в карантине.
+        doc_id = report.get("doc_id")
+        if doc_id and report.get("status") not in ("skipped_hash", "dry_run"):
+            try:
+                from scripts.resolve_review import resolve as _post_resolve
+                report["post_resolve"] = await asyncio.wait_for(
+                    _post_resolve(dry=False, use_llm=True, limit=None,
+                                  doc_id=doc_id, concurrency=4),
+                    timeout=180.0,
+                )
+            except Exception as err:  # noqa: BLE001
+                log.warning("пост-резолв документа %s не удался: %s", doc_id, err)
+                report["post_resolve"] = {"error": str(err)[:200]}
 
         # Алерт unknown_units (§4.3): из реестра единиц, накопленного за импорт.
         try:
