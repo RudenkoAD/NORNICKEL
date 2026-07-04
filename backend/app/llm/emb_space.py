@@ -19,7 +19,7 @@ from __future__ import annotations
 from typing import Optional
 
 from app.config import Settings, get_settings
-from app.llm.embeddings import OPENROUTER_EMBEDDING_MODEL
+from app.llm.embeddings import OPENAI_EMBEDDING_MODEL
 from app.llm.yandex import LLMError
 
 _VERIFIED: Optional[tuple[str, str, int]] = None
@@ -37,10 +37,11 @@ def space_signature(settings: Optional[Settings] = None) -> tuple[str, str, int]
     s = settings or get_settings()
     provider = (getattr(s, "llm_provider", "yandex") or "yandex").lower()
     if provider == "openrouter":
-        model = OPENROUTER_EMBEDDING_MODEL
-    else:
-        model = "text-search-doc+query/latest"
-    return provider, model, int(s.emb_dim)
+        # Сигнатура — по МОДЕЛИ, не по маршруту (OpenRouter-прокси и прямой
+        # OpenAI отдают одну модель → одно пространство, ре-эмбеддинг при смене
+        # маршрута не нужен).
+        return "openai", OPENAI_EMBEDDING_MODEL, int(s.emb_dim)
+    return provider, "text-search-doc+query/latest", int(s.emb_dim)
 
 
 def ensure_space(client, settings: Optional[Settings] = None) -> None:

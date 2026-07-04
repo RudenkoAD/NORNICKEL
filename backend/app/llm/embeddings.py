@@ -23,7 +23,15 @@ YANDEX_EMBEDDING_URL = (
     "https://llm.api.cloud.yandex.net/foundationModels/v1/textEmbedding"
 )
 OPENROUTER_EMBEDDING_URL = "https://openrouter.ai/api/v1/embeddings"
-OPENROUTER_EMBEDDING_MODEL = "openai/text-embedding-3-small"
+OPENAI_EMBEDDING_URL = "https://api.openai.com/v1/embeddings"
+# 04.07: large@256 (матрёшечная нарезка) ≈ small на полных 1536 по MTEB — при
+# бюджете $2-5 на корпус (~6М токенов × $0.13/М ≈ $0.8) выбор очевиден.
+# ВАЖНО: модель = сигнатура векторного пространства (emb_space, инвариант №7).
+OPENAI_EMBEDDING_MODEL = "text-embedding-3-large"
+# Каталог OpenRouter эмбеддинг-моделей не содержит (проверено 04.07: 0 из 340) —
+# рабочий путь через прямой OpenAI (OPENAI_API_KEY в .env); OR-ветка оставлена
+# на случай, если их /embeddings-прокси всё же отвечает.
+OPENROUTER_EMBEDDING_MODEL = f"openai/{OPENAI_EMBEDDING_MODEL}"
 
 MODEL_DOC = "doc"
 MODEL_QUERY = "query"
@@ -61,8 +69,16 @@ def _provider(settings: Settings) -> str:
 def _emb_headers(settings: Settings) -> dict[str, str]:
     prov = _provider(settings)
     if prov == "openrouter":
+        # Приоритет — прямой OpenAI (у OpenRouter эмбеддингов в каталоге нет);
+        # модель ОДНА в обоих маршрутах → векторное пространство одно (№7).
+        if getattr(settings, "openai_api_key", None):
+            return {
+                "Authorization": f"Bearer {settings.openai_api_key}",
+                "Content-Type": "application/json",
+            }
         if not settings.openrouter_api_key:
-            raise LLMError("OPENROUTER_API_KEY не задан — эмбеддинги недоступны.")
+            raise LLMError("Ни OPENAI_API_KEY, ни OPENROUTER_API_KEY не заданы — "
+                           "эмбеддинги недоступны.")
         return {
             "Authorization": f"Bearer {settings.openrouter_api_key}",
             "Content-Type": "application/json",
@@ -80,6 +96,12 @@ def _emb_headers(settings: Settings) -> dict[str, str]:
 def _emb_url_payload(settings: Settings, model_type: str, text: str) -> tuple[str, dict]:
     prov = _provider(settings)
     if prov == "openrouter":
+        if getattr(settings, "openai_api_key", None):
+            return OPENAI_EMBEDDING_URL, {
+                "model": OPENAI_EMBEDDING_MODEL,
+                "input": text,
+                "dimensions": settings.emb_dim,
+            }
         return OPENROUTER_EMBEDDING_URL, {
             "model": OPENROUTER_EMBEDDING_MODEL,
             "input": text,
