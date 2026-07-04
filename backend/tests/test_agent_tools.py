@@ -258,7 +258,14 @@ def test_graph_search_against_live_graph():
 
 @integration
 def test_answer_stream_event_order():
-    """orchestrator.answer_stream: события идут в правильном порядке, done несёт query_id."""
+    """orchestrator.answer_stream: контракт событий §6 для ОБОИХ исходов.
+
+    04.07: живой LLM-ключ может быть мёртв (403) — это легитимный fail-fast путь
+    (§6/инвариант №9: при LLMError → событие error и СТОП). Тест проверяет контракт
+    в обоих случаях: успех → plan…done{query_id}; отказ LLM → plan…error последним.
+    Маркер @integration декоративен (скип живёт в db-фикстуре) — тест обязан быть
+    зелёным в офлайн-наборе при любом состоянии внешних API.
+    """
     from app.agent.orchestrator import answer_stream
 
     async def _collect():
@@ -273,8 +280,12 @@ def test_answer_stream_event_order():
     events = asyncio.run(_collect())
     names = [e["event"] for e in events]
     assert names[0] == "plan"
-    assert "done" in names
-    if "error" not in names:
+    if "error" in names:
+        # Fail-fast путь (§6): error — ТЕРМИНАЛЬНОЕ событие, после него тишина.
+        assert names[-1] == "error"
+        assert "done" not in names
+    else:
+        assert "done" in names
         assert names.index("plan") < names.index("done")
         # citations и subgraph — до done.
         for evname in ("citations", "subgraph"):
