@@ -61,6 +61,31 @@ class _Chunk:
         self.text = text
 
 
+# Haiku иногда выдумывает типы вне схемы §3.2 (Organization, Institution…) — без
+# нормализации canonizer.resolve валит весь документ. Алиасы приводим к меткам,
+# остальное отбрасываем (счётчик в отчёте); связи с отброшенными концами уходят
+# обычным путём unresolved-привязки.
+_TYPE_MAP = {
+    "material": "Material", "process": "Process", "equipment": "Equipment",
+    "parameter": "Parameter", "expert": "Expert", "experiment": "Experiment",
+    "person": "Expert", "author": "Expert", "researcher": "Expert",
+    "method": "Process", "technology": "Process",
+    "device": "Equipment", "instrument": "Equipment",
+}
+
+
+def _sanitize_entities(entities: list) -> tuple[list, int]:
+    keep, dropped = [], 0
+    for e in entities:
+        canon = _TYPE_MAP.get(str(e.get("type") or "").strip().lower())
+        if canon:
+            e["type"] = canon
+            keep.append(e)
+        else:
+            dropped += 1
+    return keep, dropped
+
+
 def _valid_extraction(data: dict) -> bool:
     return isinstance(data.get("entities"), list) and isinstance(data.get("relations"), list)
 
@@ -77,7 +102,7 @@ def _load_json(path: Path) -> Optional[dict]:
 
 
 def process_one(path: Path, client: Neo4jClient, canonizer: Any, registry: Any,
-                force: bool) -> dict[str, Any]:
+                force: bool, manifest: dict[int, str]) -> dict[str, Any]:
     """Один Haiku-JSON → граф. Возвращает краткий отчёт."""
     data = _load_json(path)
     if not data or not _valid_extraction(data):
@@ -85,7 +110,15 @@ def process_one(path: Path, client: Neo4jClient, canonizer: Any, registry: Any,
 
     src = Path(data.get("source_path") or "")
     if not src.exists():
-        return {"json": path.name, "status": "source_missing", "path": str(src)}
+        # Агент мог записать мусор вместо пути — восстанавливаем по манифесту
+        # (имя файла doc_NNNN.json ↔ idx манифеста).
+        try:
+            idx = int(path.stem.rsplit("_", 1)[-1])
+            src = Path(manifest.get(idx) or "")
+        except ValueError:
+            pass
+        if not src.exists():
+            return {"json": path.name, "status": "source_missing", "path": str(src)}
 
     # Детерминированный ре-парс: content_hash (идемпотентность §4.5) + текст для
     # валидации quote. LLM-часть уже сделана Haiku — сюда не входит.
@@ -129,8 +162,9 @@ def process_one(path: Path, client: Neo4jClient, canonizer: Any, registry: Any,
     # чанкинга — цельный контекст, нет межчанковых потерь). validate_relation ищет
     # quote по этому тексту.
     chunk = _Chunk(0, parsed.text)
+    entities, dropped_types = _sanitize_entities(data.get("entities") or [])
     extraction = {
-        "entities": data.get("entities") or [],
+        "entities": entities,
         "relations": data.get("relations") or [],
         "claims": data.get("claims") or [],
         "summary": data.get("summary") or "",
@@ -159,6 +193,7 @@ def process_one(path: Path, client: Neo4jClient, canonizer: Any, registry: Any,
         "json": path.name, "status": "written", "doc_id": doc_id,
         "title": doc_meta["title"][:50],
         "entities": len(merged.get("entities") or []),
+        "dropped_types": dropped_types,
         "relations": report.get("relations", 0),
         "claims": report.get("claims", 0),
         "needs_review": report.get("needs_review", 0),
@@ -168,9 +203,18 @@ def process_one(path: Path, client: Neo4jClient, canonizer: Any, registry: Any,
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--json-dir", type=Path, required=True)
+    ap.add_argument("--manifest", type=Path,
+                    default=Path(__file__).resolve().parents[1] / "reports" / "corpus_manifest.json")
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--force", action="store_true")
     args = ap.parse_args()
+
+    manifest: dict[int, str] = {}
+    if args.manifest.exists():
+        manifest = {
+            rec["idx"]: rec["source_path"]
+            for rec in json.loads(args.manifest.read_text(encoding="utf-8"))
+        }
 
     def _alarm(_sig: int, _frame: Any) -> None:
         raise TimeoutError("parse_file hung")
@@ -200,13 +244,15 @@ def main() -> int:
 
     counts: dict[str, int] = {}
     written = 0
+    dropped_total = 0
     t0 = time.monotonic()
     for path in files:
         try:
-            rep = process_one(path, client, canonizer, registry, args.force)
+            rep = process_one(path, client, canonizer, registry, args.force, manifest)
         except Exception as err:  # noqa: BLE001 — один JSON не валит партию
             rep = {"json": path.name, "status": "error", "error": repr(err)[:120]}
         counts[rep["status"]] = counts.get(rep["status"], 0) + 1
+        dropped_total += rep.get("dropped_types", 0)
         if rep["status"] in ("written", "skipped_hash"):
             with ledger_path.open("a", encoding="utf-8") as lf:
                 lf.write(path.name + "\n")
@@ -224,7 +270,8 @@ def main() -> int:
         "unknown_units": registry.unknown_units_report(),
     }, ensure_ascii=False, indent=1), encoding="utf-8")
 
-    print(f"\nИтог: {counts}  (отчёт: {report_path.name})")
+    print(f"\nИтог: {counts}, отброшено сущностей вне схемы: {dropped_total}"
+          f"  (отчёт: {report_path.name})")
     client.close()
     return 0
 
