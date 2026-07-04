@@ -50,39 +50,6 @@ module.exports = {
   async register(ctx) {
     const dataDir = ctx.dataDir;
 
-    // --- SSE streaming test ---
-    ctx.router.get("/__sse_test", (req, res) => {
-      const tokens = ["T1 ", "T2 ", "T3 ", "T4 ", "T5 ", "T6 ", "T7 ", "T8 ", "T9 ", "T10"];
-
-      // Write headers manually via socket to bypass Express buffering
-      res.socket.write(
-        "HTTP/1.1 200 OK\r\n" +
-        "Content-Type: text/event-stream\r\n" +
-        "Cache-Control: no-cache\r\n" +
-        "Connection: keep-alive\r\n" +
-        "\r\n"
-      );
-      res.socket.setNoDelay(true);
-
-      function sse(event, data) {
-        res.socket.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-      }
-
-      sse("plan", { intent: "test" });
-      let i = 0;
-      function sendNext() {
-        if (i < tokens.length) {
-          sse("token", tokens[i]);
-          i++;
-          setTimeout(sendNext, 200);
-        } else {
-          sse("done", {});
-          res.socket.end();
-        }
-      }
-      sendNext();
-    });
-
     // --- Query ---
 
     ctx.router.post("/query", async (req, res) => {

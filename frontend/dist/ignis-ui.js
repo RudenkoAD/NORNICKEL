@@ -20806,12 +20806,12 @@ ${block.trim()}
   }
   function get_each_context10(ctx, list, i) {
     const child_ctx = ctx.slice();
-    child_ctx[32] = list[i];
+    child_ctx[34] = list[i];
     return child_ctx;
   }
   function get_each_context_14(ctx, list, i) {
     const child_ctx = ctx.slice();
-    child_ctx[35] = list[i];
+    child_ctx[37] = list[i];
     return child_ctx;
   }
   function create_if_block_64(ctx) {
@@ -20832,7 +20832,7 @@ ${block.trim()}
     );
     const get_key = (ctx2) => (
       /*s*/
-      ctx2[35].id
+      ctx2[37].id
     );
     for (let i = 0; i < each_value_1.length; i += 1) {
       let child_ctx = get_each_context_14(ctx, each_value_1, i);
@@ -20909,7 +20909,7 @@ ${block.trim()}
     let div0;
     let t0_value = (
       /*s*/
-      (ctx[35].title || "Untitled") + ""
+      (ctx[37].title || "Untitled") + ""
     );
     let t0;
     let t1;
@@ -20917,7 +20917,7 @@ ${block.trim()}
     let span0;
     let t2_value = (
       /*s*/
-      ctx[35].messageCount + ""
+      ctx[37].messageCount + ""
     );
     let t2;
     let t3;
@@ -20925,7 +20925,7 @@ ${block.trim()}
     let span1;
     let t5_value = formatDate(
       /*s*/
-      ctx[35].updatedAt
+      ctx[37].updatedAt
     ) + "";
     let t5;
     let t6;
@@ -20938,7 +20938,7 @@ ${block.trim()}
         /*click_handler*/
         ctx[18](
           /*s*/
-          ctx[35],
+          ctx[37],
           ...args
         )
       );
@@ -20948,7 +20948,7 @@ ${block.trim()}
         /*click_handler_1*/
         ctx[19](
           /*s*/
-          ctx[35]
+          ctx[37]
         )
       );
     }
@@ -20957,7 +20957,7 @@ ${block.trim()}
         /*keydown_handler*/
         ctx[20](
           /*s*/
-          ctx[35],
+          ctx[37],
           ...args
         )
       );
@@ -20992,7 +20992,7 @@ ${block.trim()}
           div2,
           "active",
           /*s*/
-          ctx[35].id === /*currentSessionId*/
+          ctx[37].id === /*currentSessionId*/
           ctx[3]
         );
         this.first = div2;
@@ -21025,16 +21025,16 @@ ${block.trim()}
         ctx = new_ctx;
         if (dirty[0] & /*sessions*/
         128 && t0_value !== (t0_value = /*s*/
-        (ctx[35].title || "Untitled") + ""))
+        (ctx[37].title || "Untitled") + ""))
           set_data(t0, t0_value);
         if (dirty[0] & /*sessions*/
         128 && t2_value !== (t2_value = /*s*/
-        ctx[35].messageCount + ""))
+        ctx[37].messageCount + ""))
           set_data(t2, t2_value);
         if (dirty[0] & /*sessions*/
         128 && t5_value !== (t5_value = formatDate(
           /*s*/
-          ctx[35].updatedAt
+          ctx[37].updatedAt
         ) + ""))
           set_data(t5, t5_value);
         if (dirty[0] & /*sessions, currentSessionId*/
@@ -21043,7 +21043,7 @@ ${block.trim()}
             div2,
             "active",
             /*s*/
-            ctx[35].id === /*currentSessionId*/
+            ctx[37].id === /*currentSessionId*/
             ctx[3]
           );
         }
@@ -21081,7 +21081,7 @@ ${block.trim()}
     let div0;
     let t_value = (
       /*msg*/
-      ctx[32].content + ""
+      ctx[34].content + ""
     );
     let t;
     return {
@@ -21100,7 +21100,7 @@ ${block.trim()}
       p(ctx2, dirty) {
         if (dirty[0] & /*messages*/
         2 && t_value !== (t_value = /*msg*/
-        ctx2[32].content + ""))
+        ctx2[34].content + ""))
           set_data(t, t_value);
       },
       d(detaching) {
@@ -21117,7 +21117,7 @@ ${block.trim()}
     let div1;
     let raw_value = (
       /*msg*/
-      ctx[32].html + ""
+      ctx[34].html + ""
     );
     return {
       c() {
@@ -21140,7 +21140,7 @@ ${block.trim()}
       p(ctx2, dirty) {
         if (dirty[0] & /*messages*/
         2 && raw_value !== (raw_value = /*msg*/
-        ctx2[32].html + ""))
+        ctx2[34].html + ""))
           div1.innerHTML = raw_value;
         ;
       },
@@ -21156,7 +21156,7 @@ ${block.trim()}
     let div0;
     let t_value = (
       /*msg*/
-      ctx[32].content + ""
+      ctx[34].content + ""
     );
     let t;
     return {
@@ -21175,7 +21175,7 @@ ${block.trim()}
       p(ctx2, dirty) {
         if (dirty[0] & /*messages*/
         2 && t_value !== (t_value = /*msg*/
-        ctx2[32].content + ""))
+        ctx2[34].content + ""))
           set_data(t, t_value);
       },
       d(detaching) {
@@ -21191,17 +21191,17 @@ ${block.trim()}
     function select_block_type(ctx2, dirty) {
       if (
         /*msg*/
-        ctx2[32].role === "user"
+        ctx2[34].role === "user"
       )
         return create_if_block_29;
       if (
         /*msg*/
-        ctx2[32].role === "agent"
+        ctx2[34].role === "agent"
       )
         return create_if_block_38;
       if (
         /*msg*/
-        ctx2[32].role === "error"
+        ctx2[34].role === "error"
       )
         return create_if_block_46;
     }
@@ -21382,7 +21382,7 @@ ${block.trim()}
     );
     const get_key = (ctx2) => (
       /*msg*/
-      ctx2[32] === /*messages*/
+      ctx2[34] === /*messages*/
       ctx2[1][
         /*messages*/
         ctx2[1].length - 1
@@ -21803,6 +21803,7 @@ A: ${p.agent}
       const query = input.trim();
       if (!query || loading)
         return;
+      stopCharAnim();
       if (messages.length === 0 && sessionTitle === "New Chat") {
         $$invalidate(6, sessionTitle = query.slice(0, 40) + (query.length > 40 ? "..." : ""));
       }
@@ -21849,23 +21850,64 @@ Current: ${query}` : query;
         $$invalidate(5, loading = false);
       }
     }
+    let charTimer = null;
+    function stopCharAnim() {
+      if (charTimer) {
+        clearTimeout(charTimer);
+        charTimer = null;
+      }
+    }
     async function handleSSE(res) {
+      stopCharAnim();
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
-      let buffer = "";
+      let buf = "";
       let eventType = "";
-      let answerText = "";
+      let fullAnswer = "";
+      let pendingChars = "";
       let citations = [];
       let subgraph = { nodes: [], edges: [] };
       let hasError = false;
+      let streaming = true;
       $$invalidate(1, messages = [...messages, { role: "agent", content: "", html: "" }]);
+      const agentIdx = messages.length - 1;
+      const before = messages.slice(0, agentIdx);
+      function tickDelay(n) {
+        if (n <= 0)
+          return 60;
+        if (n <= 3)
+          return 45;
+        if (n <= 8)
+          return 30;
+        if (n <= 20)
+          return 18;
+        if (n <= 60)
+          return 12;
+        return 8;
+      }
+      function tick2() {
+        if (pendingChars.length > 0) {
+          fullAnswer += pendingChars[0];
+          pendingChars = pendingChars.slice(1);
+          const html = `<div class="agent-block agent-block--answer">${parseMarkdown(fullAnswer)}<span class="agent-cursor">|</span></div>`;
+          $$invalidate(1, messages = [...before, { role: "agent", content: fullAnswer, html }]);
+          charTimer = setTimeout(tick2, tickDelay(pendingChars.length));
+        } else if (streaming) {
+          charTimer = setTimeout(tick2, tickDelay(0));
+        } else {
+          charTimer = null;
+        }
+      }
+      tick2();
       while (true) {
         const { done, value } = await reader.read();
-        if (done)
+        if (done) {
+          streaming = false;
           break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
+        }
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split("\n");
+        buf = lines.pop() || "";
         for (const line of lines) {
           if (line.startsWith("event: ")) {
             eventType = line.slice(7).trim();
@@ -21875,11 +21917,7 @@ Current: ${query}` : query;
               switch (eventType) {
                 case "token": {
                   const text2 = typeof payload === "string" ? payload : String(payload);
-                  answerText += text2;
-                  const html = `<div class="agent-block agent-block--answer">${parseMarkdown(answerText)}<span class="agent-cursor">|</span></div>`;
-                  const rest = messages.slice(0, -1);
-                  $$invalidate(1, messages = [...rest, { role: "agent", content: answerText, html }]);
-                  await new Promise((r) => setTimeout(r, 0));
+                  pendingChars += text2;
                   break;
                 }
                 case "citations":
@@ -21890,9 +21928,9 @@ Current: ${query}` : query;
                   break;
                 case "error":
                   hasError = true;
+                  streaming = false;
                   const errText = typeof payload === "string" ? payload : (payload == null ? void 0 : payload.message) || "Backend error";
-                  const restErr = messages.slice(0, -1);
-                  $$invalidate(1, messages = [...restErr, { role: "error", content: errText }]);
+                  $$invalidate(1, messages = [...before, { role: "error", content: errText }]);
                   break;
               }
             } catch {
@@ -21900,10 +21938,12 @@ Current: ${query}` : query;
           }
         }
       }
+      while (charTimer || pendingChars.length > 0) {
+        await new Promise((r) => setTimeout(r, 30));
+      }
       if (!hasError) {
-        const html = renderFromBackend(answerText, subgraph, citations);
-        const rest = messages.slice(0, -1);
-        $$invalidate(1, messages = [...rest, { role: "agent", content: answerText, html }]);
+        const html = renderFromBackend(fullAnswer, subgraph, citations);
+        $$invalidate(1, messages = [...before, { role: "agent", content: fullAnswer, html }]);
       }
     }
     function onKeydown(e) {
