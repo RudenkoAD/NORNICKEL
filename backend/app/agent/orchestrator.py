@@ -278,7 +278,24 @@ def _serialize_context(
     # блоков синтез не видел Experiment-узлы и интервалы на рёбрах — «оптимальная
     # скорость 0,5–0,7 м³/ч» лежала в подграфе, но не попадала в промпт.
     node_by_key = {n.get("key"): n for n in graph.get("nodes", [])}
-    exp_nodes = [n for n in graph.get("nodes", []) if n.get("label") == "Experiment"]
+    # 04.07: приоритет — целевая выборка experiments_ctx (мимо 300-узлового капа
+    # подграфа, см. _run_search_pipeline); фолбэк — скан узлов подграфа.
+    exp_ctx = graph.get("experiments_ctx") or []
+    if exp_ctx:
+        lines.append("\nЭКСПЕРИМЕНТЫ (целевая выборка по сущностям плана):")
+        for e in exp_ctx[:8]:
+            head = (f"- «{e.get('name')}» ({e.get('year') or 'б.г.'}, "
+                    f"география={e.get('geography') or '?'})")
+            if e.get("summary"):
+                head += f": {str(e['summary'])[:220]}"
+            lines.append(head)
+            for cnd in (e.get("conds") or [])[:6]:
+                if not cnd.get("to"):
+                    continue
+                val = _edge_value_str(cnd)
+                lines.append(f"    {cnd.get('type')} → {cnd.get('to')}{val}")
+    exp_nodes = [] if exp_ctx else [
+        n for n in graph.get("nodes", []) if n.get("label") == "Experiment"]
     if exp_nodes:
         lines.append("\nЭКСПЕРИМЕНТЫ (graph_search):")
         for n in exp_nodes[:8]:
@@ -404,7 +421,32 @@ async def _run_search_pipeline(
 
     node_keys = _node_keys_from_plan(plan, docs)
     graph = graph_search_tool.run(node_keys, role, depth=depth)
+    # 04.07 (кейс №4): низкосвязные Experiment-узлы проигрывают гонку за 300-узловый
+    # кап subgraphAll окрестностям документов — добираем их ЦЕЛЕВЫМ запросом (1 хоп
+    # от сущностей плана) мимо капа; сериализатор предпочитает этот список.
+    entity_keys = [k for k in node_keys if len(k) < 36]  # doc_id (uuid) отсекаем
+    if entity_keys:
+        try:
+            from app.db.neo4j_client import get_client as _gc
+            graph["experiments_ctx"] = _gc().read(_EXPERIMENTS_FOR_KEYS,
+                                                  {"keys": entity_keys})
+        except Exception as err:  # noqa: BLE001 — добор не валит конвейер
+            log.warning("experiments_ctx недоступен: %s", err)
     return strict, docs, graph, []
+
+
+_EXPERIMENTS_FOR_KEYS = """
+MATCH (e:Experiment)-[r1]-(n)
+WHERE n.canonical_id IN $keys AND coalesce(r1.deleted, false) = false
+WITH DISTINCT e LIMIT 8
+OPTIONAL MATCH (e)-[r]->(t)
+WHERE coalesce(r.deleted, false) = false
+RETURN e.exp_id AS exp_id, coalesce(e.name, e.exp_id) AS name, e.year AS year,
+       e.geography AS geography, e.summary AS summary,
+       collect({type: type(r), to: coalesce(t.name_ru, t.name),
+                value_min: r.value_min, value_max: r.value_max,
+                unit_canon: r.unit_canon, value_text: r.value_text}) AS conds
+""".strip()
 
 
 async def answer_stream(question: str, role: str) -> AsyncIterator[dict]:

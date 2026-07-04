@@ -354,6 +354,57 @@ async def post_documents(
 # ---------------------------------------------------------------------------
 # GET /documents/{doc_id} (§6): метаданные + текст (доступ по access_level)
 # ---------------------------------------------------------------------------
+@app.get("/documents/{doc_id}/source")
+def get_document_source(
+    doc_id: str,
+    request: Request,
+    chunk_idx: Optional[int] = Query(default=None, ge=0),
+    role: str = Depends(auth.get_role),
+) -> Neo4jJSONResponse:
+    """Путь исходного документа по провенансу ребра (04.07, запрос фронта).
+
+    Фронт получает на рёбрах source_doc_id/chunk_idx/quote и хочет открыть
+    исходник: отдаём source_path + corpus-относительный путь (корпус смонтирован
+    во фронте как vault «Corpus» — по относительному пути файл открывается прямо
+    в нём). chunk_idx опционален — вернём и текст чанка для показа контекста.
+    RBAC как у GET /documents/{doc_id}: partner на непубличный документ → 404
+    (не 403 — не раскрываем существование).
+    """
+    request.state.audit_subject = {"doc_id": doc_id, "chunk_idx": chunk_idx}
+    client = db()
+    try:
+        rows = client.read(q.build_docs_by_ids(role), {"doc_ids": [doc_id]})
+    except Exception as err:  # noqa: BLE001
+        raise _db_unavailable(err) from err
+    if not rows:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Документ не найден.")
+
+    src = client.read(
+        f"MATCH (d:{q.Node.DOCUMENT} {{doc_id: $id}}) RETURN d.source_path AS p",
+        {"id": doc_id})
+    source_path = (src[0].get("p") or "") if src else ""
+    # Относительный путь внутри корпуса: хвост после «/corpus/» (разделители
+    # нормализуем — фронт живёт на форвард-слэшах).
+    corpus_rel = None
+    norm = source_path.replace("\\", "/")
+    if "/corpus/" in norm:
+        corpus_rel = norm.split("/corpus/", 1)[1]
+
+    out: dict[str, Any] = {
+        "doc_id": doc_id,
+        "title": rows[0].get("title"),
+        "source_path": source_path,
+        "corpus_path": corpus_rel,
+    }
+    if chunk_idx is not None:
+        ch = client.read(
+            f"MATCH (c:{q.Node.CHUNK} {{doc_id: $id, idx: $idx}}) RETURN c.text AS text",
+            {"id": doc_id, "idx": chunk_idx})
+        out["chunk_idx"] = chunk_idx
+        out["chunk_text"] = ch[0]["text"] if ch else None
+    return Neo4jJSONResponse(content=out)
+
+
 @app.get("/documents/{doc_id}")
 def get_document(
     doc_id: str,
