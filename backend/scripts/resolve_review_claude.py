@@ -89,7 +89,9 @@ def apply_proposals(path: Path, dry: bool) -> int:
         return 1
     registry = UnitRegistry()
 
-    rows = client.read(_FETCH, {"retry": False})
+    # retry=True: fuzzy-проход уже пометил всех resolve_attempted — скоуп и так
+    # ограничен eid-ами из файла предложений.
+    rows = client.read(_FETCH, {"retry": True})
     rows = [r for r in rows if r["eid"] in proposals]
     doc_texts = load_doc_texts(client, {r["doc_id"] for r in rows})
 
