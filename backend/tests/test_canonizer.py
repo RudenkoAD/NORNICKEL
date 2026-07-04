@@ -282,3 +282,70 @@ def test_resolve_stub_uses_lemma(canon):
     assert ent.name_ru == "отработанный катализатор"
     assert "отработанного катализатора" in ent.aliases
     assert ent.unresolved is True
+
+
+# --------------------------------------------------------------------------- #
+# Fulltext-фолбэк (§4.4, 04.07): кандидаты из Neo4j → детерминированная приёмка.
+# Скор — только сортировка; принимается ТОЛЬКО точное совпадение normalize/lemma
+# с именами/алиасами узла (ложное попадание дороже промаха: промах уходит в
+# semantic_search, подмена сущности молча портит фильтры).
+# --------------------------------------------------------------------------- #
+class _FakeClient:
+    """Фейковый Neo4j-клиент: отдаёт заготовленные fulltext-кандидаты."""
+
+    def __init__(self, rows=None, raise_err=False):
+        self.rows = rows or []
+        self.raise_err = raise_err
+        self.calls = 0
+
+    def read(self, cypher, params=None):
+        self.calls += 1
+        if self.raise_err:
+            raise RuntimeError("no such fulltext index: entity_names")
+        return self.rows
+
+
+def _node(**props):
+    return props  # canonizer читает узлы через .get — dict достаточно
+
+
+def _ft_canon(rows=None, raise_err=False) -> Canonizer:
+    return Canonizer(neo4j_client=_FakeClient(rows, raise_err))
+
+
+def test_ft_fallback_accepts_exact_alias_match():
+    rows = [{"node": _node(canonical_id="kek-melnica", name_ru="мельница КЭК",
+                           aliases=["мельницы кэк"], unresolved=True), "score": 0.4}]
+    hit = _ft_canon(rows).lookup("мельницы КЭК", Node.EQUIPMENT)
+    assert hit is not None and hit.canonical_id == "kek-melnica"
+
+
+def test_ft_fallback_rejects_near_miss():
+    # Lucene по запросу «синий турмалин» отдаёт узел «турмалин» (частичное
+    # совпадение с высоким скором) — приёмка обязана отвергнуть: разные понятия.
+    rows = [{"node": _node(canonical_id="turmalin", name_ru="турмалин",
+                           aliases=["tourmaline"]), "score": 9.9}]
+    assert _ft_canon(rows).lookup("синий турмалин", Node.MATERIAL) is None
+
+
+def test_ft_fallback_prefers_reference_over_unresolved():
+    rows = [
+        {"node": _node(canonical_id="dup-unres", name_ru="флотация х",
+                       aliases=["флотация х"], unresolved=True), "score": 9.0},
+        {"node": _node(canonical_id="ref-x", name_ru="флотация х",
+                       aliases=[], unresolved=False), "score": 1.0},
+    ]
+    hit = _ft_canon(rows).lookup("флотация Х", Node.PROCESS)
+    assert hit is not None and hit.canonical_id == "ref-x"
+
+
+def test_ft_fallback_survives_missing_index():
+    c = _ft_canon(raise_err=True)
+    assert c.lookup("небывалый термин запроса", Node.MATERIAL) is None
+    # второй вызов тоже тихо промахивается (warn-once, без исключений)
+    assert c.lookup("другой небывалый термин", Node.PROCESS) is None
+
+
+def test_ft_fallback_not_called_without_client(canon):
+    # штатный канонизатор без клиента: промах — просто None, без обращений к БД
+    assert canon.lookup("совершенно небывалый термин", Node.MATERIAL) is None
