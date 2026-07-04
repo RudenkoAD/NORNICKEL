@@ -2,6 +2,8 @@
 var { Plugin, ItemView, MarkdownView } = require("obsidian");
 var VIEW_TYPE = "obsidian-agent-chat";
 var VIEW_TITLE = "Agent Chat";
+var GRAPH_VIEW_TYPE = "obsidian-agent-graph";
+var GRAPH_VIEW_TITLE = "Knowledge Graph";
 function selectTextInEditor(editor, content, quote) {
   const idx = content.indexOf(quote);
   if (idx === -1) {
@@ -44,9 +46,49 @@ async function openAndHighlight(app, path, quote) {
     return;
   selectTextInEditor(view.editor, content, quote);
 }
-var AgentChatView = class extends ItemView {
+var _graphData = null;
+var GraphView = class extends ItemView {
   constructor(leaf) {
     super(leaf);
+  }
+  getViewType() {
+    return GRAPH_VIEW_TYPE;
+  }
+  getDisplayText() {
+    return GRAPH_VIEW_TITLE;
+  }
+  getIcon() {
+    return "dot-network";
+  }
+  async onOpen() {
+    const container = this.containerEl.children[1];
+    container.empty();
+    container.classList.add("agent-graph-full");
+    if (!window.IgnisUI || !window.IgnisUI.GraphPane) {
+      container.createEl("div", {
+        text: "GraphPane component not available. Try reloading."
+      });
+      return;
+    }
+    const nodes = (_graphData == null ? void 0 : _graphData.nodes) || [];
+    const edges = (_graphData == null ? void 0 : _graphData.edges) || [];
+    this._svelte = new window.IgnisUI.GraphPane({
+      target: container,
+      props: { nodes, edges }
+    });
+  }
+  async onClose() {
+    if (this._svelte) {
+      this._svelte.$destroy();
+      this._svelte = null;
+    }
+    _graphData = null;
+  }
+};
+var AgentChatView = class extends ItemView {
+  constructor(leaf, plugin) {
+    super(leaf);
+    this._plugin = plugin;
   }
   getViewType() {
     return VIEW_TYPE;
@@ -68,11 +110,16 @@ var AgentChatView = class extends ItemView {
       });
       return;
     }
+    const plugin = this._plugin;
     this._svelte = new window.IgnisUI.ChatView({
       target: container,
       props: {
         linkHandler: (path, quote) => {
           openAndHighlight(this.app, path, quote);
+        },
+        graphHandler: (subgraph) => {
+          _graphData = subgraph;
+          plugin.openGraphView();
         }
       }
     });
@@ -90,7 +137,8 @@ var IgnisAgentPlugin = class extends Plugin {
       console.log("[ignis-agent] Not running in Ignis - plugin is a no-op.");
       return;
     }
-    this.registerView(VIEW_TYPE, (leaf) => new AgentChatView(leaf));
+    this.registerView(VIEW_TYPE, (leaf) => new AgentChatView(leaf, this));
+    this.registerView(GRAPH_VIEW_TYPE, (leaf) => new GraphView(leaf));
     this.addRibbonIcon("menu", VIEW_TITLE, () => {
       this.activateView();
     });
@@ -107,6 +155,7 @@ var IgnisAgentPlugin = class extends Plugin {
     if (!window.__ignis)
       return;
     this.app.workspace.detachLeavesOfType(VIEW_TYPE);
+    this.app.workspace.detachLeavesOfType(GRAPH_VIEW_TYPE);
     console.log("[ignis-agent] Unloaded");
   }
   async activateView() {
@@ -121,6 +170,21 @@ var IgnisAgentPlugin = class extends Plugin {
       return;
     await leaf.setViewState({
       type: VIEW_TYPE,
+      active: true
+    });
+  }
+  async openGraphView() {
+    const { workspace } = this.app;
+    const existing = workspace.getLeavesOfType(GRAPH_VIEW_TYPE);
+    if (existing.length > 0) {
+      workspace.revealLeaf(existing[0]);
+      return;
+    }
+    const leaf = workspace.getLeaf(false);
+    if (!leaf)
+      return;
+    await leaf.setViewState({
+      type: GRAPH_VIEW_TYPE,
       active: true
     });
   }

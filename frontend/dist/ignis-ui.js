@@ -24,6 +24,7 @@ var IgnisUI = (() => {
     Banner: () => Banner_default,
     ChatView: () => ChatView_default,
     ConfirmDialog: () => ConfirmDialog_default,
+    GraphPane: () => GraphPane_default,
     LOADING_ANALYZE: () => LOADING_ANALYZE,
     LOADING_FETCH: () => LOADING_FETCH,
     LOADING_GENERATE: () => LOADING_GENERATE,
@@ -143,7 +144,6 @@ var IgnisUI = (() => {
   // node_modules/svelte/src/runtime/internal/utils.js
   function noop() {
   }
-  var identity = (x3) => x3;
   function assign(tar, src) {
     for (const k in src)
       tar[k] = src[k];
@@ -237,37 +237,6 @@ var IgnisUI = (() => {
     return result;
   }
 
-  // node_modules/svelte/src/runtime/internal/environment.js
-  var is_client = typeof window !== "undefined";
-  var now = is_client ? () => window.performance.now() : () => Date.now();
-  var raf = is_client ? (cb) => requestAnimationFrame(cb) : noop;
-
-  // node_modules/svelte/src/runtime/internal/loop.js
-  var tasks = /* @__PURE__ */ new Set();
-  function run_tasks(now3) {
-    tasks.forEach((task) => {
-      if (!task.c(now3)) {
-        tasks.delete(task);
-        task.f();
-      }
-    });
-    if (tasks.size !== 0)
-      raf(run_tasks);
-  }
-  function loop(callback) {
-    let task;
-    if (tasks.size === 0)
-      raf(run_tasks);
-    return {
-      promise: new Promise((fulfill) => {
-        tasks.add(task = { c: callback, f: fulfill });
-      }),
-      abort() {
-        tasks.delete(task);
-      }
-    };
-  }
-
   // node_modules/svelte/src/runtime/internal/globals.js
   var globals = typeof window !== "undefined" ? window : typeof globalThis !== "undefined" ? globalThis : (
     // @ts-ignore Node typings have this
@@ -353,12 +322,6 @@ var IgnisUI = (() => {
       );
     }
     return node.ownerDocument;
-  }
-  function append_empty_stylesheet(node) {
-    const style_element = element("style");
-    style_element.textContent = "/* empty */";
-    append_stylesheet(get_root_for_style(node), style_element);
-    return style_element.sheet;
   }
   function append_stylesheet(node, style) {
     append(
@@ -551,70 +514,6 @@ var IgnisUI = (() => {
     return new component(props);
   }
 
-  // node_modules/svelte/src/runtime/internal/style_manager.js
-  var managed_styles = /* @__PURE__ */ new Map();
-  var active = 0;
-  function hash(str) {
-    let hash2 = 5381;
-    let i = str.length;
-    while (i--)
-      hash2 = (hash2 << 5) - hash2 ^ str.charCodeAt(i);
-    return hash2 >>> 0;
-  }
-  function create_style_information(doc, node) {
-    const info = { stylesheet: append_empty_stylesheet(node), rules: {} };
-    managed_styles.set(doc, info);
-    return info;
-  }
-  function create_rule(node, a2, b, duration, delay, ease, fn, uid = 0) {
-    const step = 16.666 / duration;
-    let keyframes = "{\n";
-    for (let p = 0; p <= 1; p += step) {
-      const t = a2 + (b - a2) * ease(p);
-      keyframes += p * 100 + `%{${fn(t, 1 - t)}}
-`;
-    }
-    const rule = keyframes + `100% {${fn(b, 1 - b)}}
-}`;
-    const name = `__svelte_${hash(rule)}_${uid}`;
-    const doc = get_root_for_style(node);
-    const { stylesheet, rules } = managed_styles.get(doc) || create_style_information(doc, node);
-    if (!rules[name]) {
-      rules[name] = true;
-      stylesheet.insertRule(`@keyframes ${name} ${rule}`, stylesheet.cssRules.length);
-    }
-    const animation = node.style.animation || "";
-    node.style.animation = `${animation ? `${animation}, ` : ""}${name} ${duration}ms linear ${delay}ms 1 both`;
-    active += 1;
-    return name;
-  }
-  function delete_rule(node, name) {
-    const previous = (node.style.animation || "").split(", ");
-    const next = previous.filter(
-      name ? (anim) => anim.indexOf(name) < 0 : (anim) => anim.indexOf("__svelte") === -1
-      // remove all Svelte animations
-    );
-    const deleted = previous.length - next.length;
-    if (deleted) {
-      node.style.animation = next.join(", ");
-      active -= deleted;
-      if (!active)
-        clear_rules();
-    }
-  }
-  function clear_rules() {
-    raf(() => {
-      if (active)
-        return;
-      managed_styles.forEach((info) => {
-        const { ownerNode } = info.stylesheet;
-        if (ownerNode)
-          detach(ownerNode);
-      });
-      managed_styles.clear();
-    });
-  }
-
   // node_modules/svelte/src/runtime/internal/lifecycle.js
   var current_component;
   function set_current_component(component) {
@@ -730,19 +629,6 @@ var IgnisUI = (() => {
   }
 
   // node_modules/svelte/src/runtime/internal/transitions.js
-  var promise;
-  function wait() {
-    if (!promise) {
-      promise = Promise.resolve();
-      promise.then(() => {
-        promise = null;
-      });
-    }
-    return promise;
-  }
-  function dispatch(node, direction, kind) {
-    node.dispatchEvent(custom_event(`${direction ? "intro" : "outro"}${kind}`));
-  }
   var outroing = /* @__PURE__ */ new Set();
   var outros;
   function group_outros() {
@@ -782,132 +668,6 @@ var IgnisUI = (() => {
     } else if (callback) {
       callback();
     }
-  }
-  var null_transition = { duration: 0 };
-  function create_bidirectional_transition(node, fn, params, intro) {
-    const options = { direction: "both" };
-    let config = fn(node, params, options);
-    let t = intro ? 0 : 1;
-    let running_program = null;
-    let pending_program = null;
-    let animation_name = null;
-    let original_inert_value;
-    function clear_animation() {
-      if (animation_name)
-        delete_rule(node, animation_name);
-    }
-    function init3(program, duration) {
-      const d = (
-        /** @type {Program['d']} */
-        program.b - t
-      );
-      duration *= Math.abs(d);
-      return {
-        a: t,
-        b: program.b,
-        d,
-        duration,
-        start: program.start,
-        end: program.start + duration,
-        group: program.group
-      };
-    }
-    function go(b) {
-      const {
-        delay = 0,
-        duration = 300,
-        easing = identity,
-        tick: tick2 = noop,
-        css
-      } = config || null_transition;
-      const program = {
-        start: now() + delay,
-        b
-      };
-      if (!b) {
-        program.group = outros;
-        outros.r += 1;
-      }
-      if ("inert" in node) {
-        if (b) {
-          if (original_inert_value !== void 0) {
-            node.inert = original_inert_value;
-          }
-        } else {
-          original_inert_value = /** @type {HTMLElement} */
-          node.inert;
-          node.inert = true;
-        }
-      }
-      if (running_program || pending_program) {
-        pending_program = program;
-      } else {
-        if (css) {
-          clear_animation();
-          animation_name = create_rule(node, t, b, duration, delay, easing, css);
-        }
-        if (b)
-          tick2(0, 1);
-        running_program = init3(program, duration);
-        add_render_callback(() => dispatch(node, b, "start"));
-        loop((now3) => {
-          if (pending_program && now3 > pending_program.start) {
-            running_program = init3(pending_program, duration);
-            pending_program = null;
-            dispatch(node, running_program.b, "start");
-            if (css) {
-              clear_animation();
-              animation_name = create_rule(
-                node,
-                t,
-                running_program.b,
-                running_program.duration,
-                0,
-                easing,
-                config.css
-              );
-            }
-          }
-          if (running_program) {
-            if (now3 >= running_program.end) {
-              tick2(t = running_program.b, 1 - t);
-              dispatch(node, running_program.b, "end");
-              if (!pending_program) {
-                if (running_program.b) {
-                  clear_animation();
-                } else {
-                  if (!--running_program.group.r)
-                    run_all(running_program.group.c);
-                }
-              }
-              running_program = null;
-            } else if (now3 >= running_program.start) {
-              const p = now3 - running_program.start;
-              t = running_program.a + running_program.d * easing(p / running_program.duration);
-              tick2(t, 1 - t);
-            }
-          }
-          return !!(running_program || pending_program);
-        });
-      }
-    }
-    return {
-      run(b) {
-        if (is_function(config)) {
-          wait().then(() => {
-            const opts = { direction: b ? "in" : "out" };
-            config = config(opts);
-            go(b);
-          });
-        } else {
-          go(b);
-        }
-      },
-      end() {
-        clear_animation();
-        running_program = pending_program = null;
-      }
-    };
   }
 
   // node_modules/svelte/src/runtime/internal/each.js
@@ -6095,9 +5855,9 @@ var IgnisUI = (() => {
     let { dismissible = true } = $$props;
     let { title = "" } = $$props;
     let { id: id2 = void 0 } = $$props;
-    const dispatch3 = createEventDispatcher();
+    const dispatch2 = createEventDispatcher();
     function dismiss() {
-      dispatch3("dismiss");
+      dispatch2("dismiss");
     }
     $$self.$$set = ($$props2) => {
       if ("severity" in $$props2)
@@ -6240,10 +6000,10 @@ var IgnisUI = (() => {
     };
   }
   function instance28($$self) {
-    const dispatch3 = createEventDispatcher();
+    const dispatch2 = createEventDispatcher();
     const origin = window.location.origin;
     function onDismiss() {
-      dispatch3("dismiss");
+      dispatch2("dismiss");
     }
     return [origin, onDismiss];
   }
@@ -6684,13 +6444,13 @@ var IgnisUI = (() => {
     let { title = "" } = $$props;
     let { width = "600px" } = $$props;
     let { closeOnOverlayClick = true } = $$props;
-    const dispatch3 = createEventDispatcher();
+    const dispatch2 = createEventDispatcher();
     let overlayEl;
     function close() {
       if (overlayEl) {
         overlayEl.remove();
       }
-      dispatch3("close");
+      dispatch2("close");
     }
     function onOverlayClick(e) {
       if (e.target === overlayEl && closeOnOverlayClick) {
@@ -6699,7 +6459,7 @@ var IgnisUI = (() => {
     }
     function onKeydown(e) {
       if (e.key === "Escape") {
-        dispatch3("escape");
+        dispatch2("escape");
       }
     }
     function dismiss() {
@@ -7012,10 +6772,10 @@ var IgnisUI = (() => {
     let { disabled = false } = $$props;
     let { title = "" } = $$props;
     let { type: type2 = "button" } = $$props;
-    const dispatch3 = createEventDispatcher();
+    const dispatch2 = createEventDispatcher();
     function onClick(e) {
       if (!disabled) {
-        dispatch3("click", e);
+        dispatch2("click", e);
       }
     }
     $$self.$$set = ($$props2) => {
@@ -7491,14 +7251,14 @@ var IgnisUI = (() => {
     let { placeholder = "" } = $$props;
     let { confirmText = "Confirm" } = $$props;
     let { width = "500px" } = $$props;
-    const dispatch3 = createEventDispatcher();
+    const dispatch2 = createEventDispatcher();
     let modalRef;
     function onConfirm() {
-      dispatch3("confirm", value);
+      dispatch2("confirm", value);
     }
     function onCancel() {
       modalRef.dismiss();
-      dispatch3("cancel");
+      dispatch2("cancel");
     }
     function onEscape() {
       onCancel();
@@ -8026,14 +7786,14 @@ var IgnisUI = (() => {
     let { confirmText = "Confirm" } = $$props;
     let { confirmVariant = "primary" } = $$props;
     let { width = "500px" } = $$props;
-    const dispatch3 = createEventDispatcher();
+    const dispatch2 = createEventDispatcher();
     let modalRef;
     function onConfirm() {
-      dispatch3("confirm");
+      dispatch2("confirm");
     }
     function onCancel() {
       modalRef.dismiss();
-      dispatch3("cancel");
+      dispatch2("cancel");
     }
     function onEscape() {
       onCancel();
@@ -8315,11 +8075,11 @@ var IgnisUI = (() => {
     let { title = "Message" } = $$props;
     let { message = "" } = $$props;
     let { width = "500px" } = $$props;
-    const dispatch3 = createEventDispatcher();
+    const dispatch2 = createEventDispatcher();
     let modalRef;
     function onConfirm() {
       modalRef.dismiss();
-      dispatch3("confirm");
+      dispatch2("confirm");
     }
     function onEscape() {
       onConfirm();
@@ -8458,9 +8218,9 @@ var IgnisUI = (() => {
   function instance34($$self, $$props, $$invalidate) {
     let { value = "" } = $$props;
     let { placeholder = "Search" } = $$props;
-    const dispatch3 = createEventDispatcher();
+    const dispatch2 = createEventDispatcher();
     function onInput(e) {
-      dispatch3("input", e.target.value);
+      dispatch2("input", e.target.value);
     }
     $$self.$$set = ($$props2) => {
       if ("value" in $$props2)
@@ -8990,12 +8750,12 @@ var IgnisUI = (() => {
     const $$slots = compute_slots(slots);
     let { primary = "" } = $$props;
     let { secondary = "" } = $$props;
-    let { active: active2 = false } = $$props;
+    let { active = false } = $$props;
     let { clickable = true } = $$props;
-    const dispatch3 = createEventDispatcher();
+    const dispatch2 = createEventDispatcher();
     function onClick() {
       if (clickable) {
-        dispatch3("click");
+        dispatch2("click");
       }
     }
     $$self.$$set = ($$props2) => {
@@ -9004,13 +8764,13 @@ var IgnisUI = (() => {
       if ("secondary" in $$props2)
         $$invalidate(1, secondary = $$props2.secondary);
       if ("active" in $$props2)
-        $$invalidate(2, active2 = $$props2.active);
+        $$invalidate(2, active = $$props2.active);
       if ("clickable" in $$props2)
         $$invalidate(3, clickable = $$props2.clickable);
       if ("$$scope" in $$props2)
         $$invalidate(6, $$scope = $$props2.$$scope);
     };
-    return [primary, secondary, active2, clickable, onClick, $$slots, $$scope, slots];
+    return [primary, secondary, active, clickable, onClick, $$slots, $$scope, slots];
   }
   var ListItem = class extends SvelteComponent {
     constructor(options) {
@@ -9252,14 +9012,14 @@ var IgnisUI = (() => {
   function instance36($$self, $$props, $$invalidate) {
     let { open = false } = $$props;
     let { items = [] } = $$props;
-    const dispatch3 = createEventDispatcher();
+    const dispatch2 = createEventDispatcher();
     function onTriggerClick(e) {
       e.stopPropagation();
-      dispatch3("toggle");
+      dispatch2("toggle");
     }
     function onItemClick(e, item) {
       e.stopPropagation();
-      dispatch3("select", item);
+      dispatch2("select", item);
     }
     const click_handler = (item, e) => onItemClick(e, item);
     $$self.$$set = ($$props2) => {
@@ -14105,7 +13865,7 @@ var IgnisUI = (() => {
     } } = $$props;
     let { onEditRole = () => {
     } } = $$props;
-    const dispatch3 = createEventDispatcher();
+    const dispatch2 = createEventDispatcher();
     let showCreate = false;
     let createName = "";
     let createDisplayName = "";
@@ -15822,7 +15582,7 @@ var IgnisUI = (() => {
     } } = $$props;
     let { onClose = () => {
     } } = $$props;
-    const dispatch3 = createEventDispatcher();
+    const dispatch2 = createEventDispatcher();
     let displayName = "";
     let permissions = [];
     let fileAccessType = "";
@@ -19388,7 +19148,7 @@ var IgnisUI = (() => {
   function instance43($$self, $$props, $$invalidate) {
     let { vault } = $$props;
     let { linked = false } = $$props;
-    const dispatch3 = createEventDispatcher();
+    const dispatch2 = createEventDispatcher();
     let expanded = false;
     let vaultPassword = "";
     let deviceName = "ignis-headless";
@@ -19399,7 +19159,7 @@ var IgnisUI = (() => {
     }
     async function onLink() {
       $$invalidate(6, linking = true);
-      dispatch3("link", {
+      dispatch2("link", {
         vault,
         vaultPassword: vaultPassword || void 0,
         deviceName,
@@ -19771,12 +19531,12 @@ var IgnisUI = (() => {
   function instance44($$self, $$props, $$invalidate) {
     let { vaults = [] } = $$props;
     let { loading = false } = $$props;
-    const dispatch3 = createEventDispatcher();
+    const dispatch2 = createEventDispatcher();
     function onLink(e) {
-      dispatch3("link", e.detail);
+      dispatch2("link", e.detail);
     }
     function onCreate() {
-      dispatch3("create");
+      dispatch2("create");
     }
     $$self.$$set = ($$props2) => {
       if ("vaults" in $$props2)
@@ -20269,7 +20029,7 @@ var IgnisUI = (() => {
     };
   }
   function instance45($$self, $$props, $$invalidate) {
-    const dispatch3 = createEventDispatcher();
+    const dispatch2 = createEventDispatcher();
     let name = "";
     let region = "";
     let encryption = "e2ee";
@@ -20302,14 +20062,14 @@ var IgnisUI = (() => {
           const data = await res.json().catch(() => ({}));
           throw new Error(data.error || `Request failed: ${res.status}`);
         }
-        dispatch3("created");
+        dispatch2("created");
       } catch (e) {
         $$invalidate(5, error = e.message);
         $$invalidate(4, creating = false);
       }
     }
     function onBack() {
-      dispatch3("back");
+      dispatch2("back");
     }
     function input_input_handler() {
       name = this.value;
@@ -20734,7 +20494,7 @@ var IgnisUI = (() => {
   function instance46($$self, $$props, $$invalidate) {
     let { vaultId } = $$props;
     let { onSuccess = null } = $$props;
-    const dispatch3 = createEventDispatcher();
+    const dispatch2 = createEventDispatcher();
     let modalRef;
     let view = "list";
     let vaults = [];
@@ -20792,7 +20552,7 @@ var IgnisUI = (() => {
       fetchVaults();
     }
     function onClose() {
-      dispatch3("close");
+      dispatch2("close");
     }
     const create_handler = () => $$invalidate(1, view = "create");
     const back_handler = () => $$invalidate(1, view = "list");
@@ -21044,21 +20804,1348 @@ ${block.trim()}
     return html;
   }
 
-  // node_modules/svelte/src/runtime/transition/index.js
-  function fade(node, { delay = 0, duration = 400, easing = identity } = {}) {
-    const o = +getComputedStyle(node).opacity;
+  // packages/ui/src/views/agent/ChatView.svelte
+  function add_css21(target) {
+    append_styles(target, "svelte-15k88kk", ".agent-chat-container{display:flex;flex-direction:column;height:100%;overflow:hidden}.agent-chat-header{padding:8px 12px;border-bottom:1px solid var(--background-modifier-border);flex-shrink:0;display:flex;align-items:center;justify-content:space-between;gap:8px}.agent-chat-header-left{display:flex;align-items:center;gap:8px;min-width:0}.agent-chat-header h3{margin:0;font-size:0.95em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.agent-chat-sessions-btn{background:none;border:none;color:var(--text-muted);cursor:pointer;width:28px;height:28px;padding:0;border-radius:4px;display:flex;align-items:center;justify-content:center;flex-shrink:0}.agent-chat-sessions-btn:hover{color:var(--text-normal);background:var(--background-modifier-hover)}.agent-chat-new-btn{background:none;border:none;color:var(--text-muted);cursor:pointer;width:28px;height:28px;padding:0;border-radius:4px;display:flex;align-items:center;justify-content:center;flex-shrink:0}.agent-chat-new-btn:hover{color:var(--text-accent);background:var(--background-modifier-hover)}.agent-chat-body{display:flex;flex:1;min-height:0}.agent-sessions-panel{width:220px;flex-shrink:0;border-right:1px solid var(--background-modifier-border);display:flex;flex-direction:column;overflow:hidden}.agent-sessions-panel-header{padding:8px 12px;font-size:0.8em;font-weight:600;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.05em;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--background-modifier-border)}.agent-sessions-list{flex:1;overflow-y:auto;padding:4px}.agent-session-item{padding:8px 10px;border-radius:6px;cursor:pointer;position:relative}.agent-session-item:hover{background:var(--background-modifier-hover)}.agent-session-item.active{background:var(--background-modifier-hover)}.agent-session-item-title{font-size:0.85em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:20px}.agent-session-item-meta{font-size:0.72em;color:var(--text-muted);display:flex;gap:8px;margin-top:2px}.agent-session-delete{position:absolute;top:8px;right:6px;background:none;border:none;color:var(--text-muted);cursor:pointer;padding:2px;border-radius:3px;display:none}.agent-session-item:hover .agent-session-delete{display:flex}.agent-session-delete:hover{color:var(--text-error);background:var(--background-modifier-error)}.agent-chat-messages{flex:1;overflow-y:auto;padding:12px 16px;display:flex;flex-direction:column;gap:12px;user-select:text;-webkit-user-select:text}.agent-chat-placeholder{color:var(--text-muted);text-align:center;padding:24px 0;font-style:italic}.agent-chat-message{border-radius:8px;padding:8px 12px;max-width:90%;user-select:text;-webkit-user-select:text}.agent-chat-message--user{align-self:flex-end;background-color:var(--interactive-accent);color:var(--text-on-accent)}.agent-chat-message--agent{align-self:flex-start;background-color:var(--background-modifier-hover);border:1px solid var(--background-modifier-border);max-width:95%}.agent-chat-message--error{align-self:center;background-color:var(--background-modifier-error);color:var(--text-error);font-size:0.85em}.agent-chat-message-header{font-size:0.75em;opacity:0.7;margin-bottom:4px}.agent-chat-message-role{font-weight:600}.agent-chat-message-body{font-size:0.9em;line-height:1.5;word-break:break-word}.agent-chat-message-body a{color:var(--link-color);text-decoration:none}.agent-chat-message-body a:hover{text-decoration:underline}.agent-chat-loading{align-self:flex-start;color:var(--text-muted);font-style:italic;font-size:0.85em;padding:8px 12px}.agent-block{margin-top:10px}.agent-block--answer{margin-top:0}.agent-block--answer h2,.agent-block--answer h3,.agent-block--answer h4{margin:10px 0 4px;font-size:1em}.agent-block--answer h3{font-weight:700}.agent-block--answer h4{font-weight:600}.agent-block--answer p{margin:4px 0}.agent-block--answer ul,.agent-block--answer ol{margin:4px 0;padding-left:20px}.agent-block--answer li{margin:2px 0}.agent-block--answer code{background:var(--background-modifier-border);padding:1px 4px;border-radius:3px;font-size:0.85em}.agent-block--answer strong{font-weight:700}.agent-block--answer em{font-style:italic}.agent-block--answer hr{border:none;border-top:1px solid var(--background-modifier-border);margin:8px 0}.agent-block--answer a{color:var(--link-color);text-decoration:underline}.agent-block-label{font-weight:600;font-size:0.8em;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px;letter-spacing:0.05em}.agent-entity-list{display:flex;flex-wrap:wrap;gap:4px}.agent-entity{display:inline-block;padding:2px 8px;border-radius:4px;font-size:0.82em;font-weight:500}.agent-entity--material{background:rgba(78, 121, 167, 0.15);color:var(--text-accent)}.agent-entity--experiment{background:rgba(89, 161, 79, 0.15);color:#59a14f}.agent-entity--property{background:rgba(237, 201, 72, 0.15);color:#c9a90e}.agent-entity--regime{background:rgba(225, 87, 89, 0.15);color:#e15759}.agent-entity--equipment{background:rgba(178, 126, 197, 0.15);color:#b07cc5}.agent-entity--team{background:rgba(242, 142, 44, 0.15);color:#f28e2c}.agent-entity--topic{background:rgba(118, 183, 178, 0.15);color:#76b7b2}.agent-relation-list{font-size:0.85em}.agent-relation{padding:2px 0}.agent-relation-type{color:var(--text-accent);font-style:italic}.agent-source-list{display:flex;flex-direction:column;gap:6px}.agent-source{padding:6px 8px;border-left:3px solid var(--interactive-accent);background:var(--background-primary);border-radius:0 4px 4px 0}.agent-source-link{margin-bottom:2px}.agent-link{color:var(--link-color);cursor:pointer;text-decoration:underline;font-weight:500}.agent-link:hover{color:var(--link-color-hover)}.agent-source-excerpt{font-size:0.82em;color:var(--text-muted);font-style:italic}.agent-gap-list{display:flex;flex-direction:column;gap:4px}.agent-gap{display:flex;gap:6px;padding:4px 0;font-size:0.85em}.agent-gap-icon{flex-shrink:0;color:var(--text-warning)}.agent-gap-text{color:var(--text-muted)}.agent-chat-input-area{padding:8px 12px;border-top:1px solid var(--background-modifier-border);display:flex;gap:8px;flex-shrink:0}.agent-chat-input{flex:1;resize:none;border-radius:6px;padding:8px;font-size:0.9em;background:var(--background-primary);color:var(--text-normal);border:1px solid var(--background-modifier-border);font-family:inherit}.agent-chat-input:focus{outline:none;border-color:var(--interactive-accent)}.agent-chat-send-button{align-self:flex-end;padding:8px 16px;border-radius:6px;border:none;background:var(--interactive-accent);color:var(--text-on-accent);cursor:pointer;font-weight:600;font-size:0.9em}.agent-chat-send-button:hover{opacity:0.85}.agent-open-graph-btn{display:block;margin-top:10px;padding:6px 14px;border-radius:6px;border:1px solid var(--background-modifier-border);background:var(--background-primary);color:var(--text-accent);cursor:pointer;font-size:0.82em;font-weight:500}.agent-open-graph-btn:hover{background:var(--background-modifier-hover)}.agent-loading-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--text-muted);margin-right:3px;animation:svelte-15k88kk-agent-dot-pulse 1.4s ease-in-out infinite both}.agent-loading-dot:nth-child(1){animation-delay:0s}.agent-loading-dot:nth-child(2){animation-delay:0.2s}.agent-loading-dot:nth-child(3){animation-delay:0.4s}@keyframes svelte-15k88kk-agent-dot-pulse{0%,80%,100%{opacity:0.2;transform:scale(0.8)}40%{opacity:1;transform:scale(1.1)}}.agent-cursor{animation:svelte-15k88kk-agent-blink 1s step-end infinite;color:var(--interactive-accent);font-weight:700}@keyframes svelte-15k88kk-agent-blink{50%{opacity:0}}");
+  }
+  function get_each_context10(ctx, list, i) {
+    const child_ctx = ctx.slice();
+    child_ctx[37] = list[i];
+    return child_ctx;
+  }
+  function get_each_context_14(ctx, list, i) {
+    const child_ctx = ctx.slice();
+    child_ctx[40] = list[i];
+    return child_ctx;
+  }
+  function create_if_block_74(ctx) {
+    let div2;
+    let div0;
+    let span;
+    let t1;
+    let button;
+    let t2;
+    let div1;
+    let each_blocks = [];
+    let each_1_lookup = /* @__PURE__ */ new Map();
+    let mounted;
+    let dispose;
+    let each_value_1 = ensure_array_like(
+      /*sessions*/
+      ctx[7]
+    );
+    const get_key = (ctx2) => (
+      /*s*/
+      ctx2[40].id
+    );
+    for (let i = 0; i < each_value_1.length; i += 1) {
+      let child_ctx = get_each_context_14(ctx, each_value_1, i);
+      let key = get_key(child_ctx);
+      each_1_lookup.set(key, each_blocks[i] = create_each_block_14(key, child_ctx));
+    }
     return {
-      delay,
-      duration,
-      easing,
-      css: (t) => `opacity: ${t * o}`
+      c() {
+        div2 = element("div");
+        div0 = element("div");
+        span = element("span");
+        span.textContent = "Sessions";
+        t1 = space();
+        button = element("button");
+        button.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>`;
+        t2 = space();
+        div1 = element("div");
+        for (let i = 0; i < each_blocks.length; i += 1) {
+          each_blocks[i].c();
+        }
+        attr(button, "class", "agent-chat-new-btn");
+        attr(button, "title", "New Chat");
+        attr(div0, "class", "agent-sessions-panel-header");
+        attr(div1, "class", "agent-sessions-list");
+        attr(div2, "class", "agent-sessions-panel");
+      },
+      m(target, anchor) {
+        insert(target, div2, anchor);
+        append(div2, div0);
+        append(div0, span);
+        append(div0, t1);
+        append(div0, button);
+        append(div2, t2);
+        append(div2, div1);
+        for (let i = 0; i < each_blocks.length; i += 1) {
+          if (each_blocks[i]) {
+            each_blocks[i].m(div1, null);
+          }
+        }
+        if (!mounted) {
+          dispose = listen(
+            button,
+            "click",
+            /*newChat*/
+            ctx[11]
+          );
+          mounted = true;
+        }
+      },
+      p(ctx2, dirty) {
+        if (dirty[0] & /*sessions, currentSessionId, loadSession, deleteSession*/
+        1672) {
+          each_value_1 = ensure_array_like(
+            /*sessions*/
+            ctx2[7]
+          );
+          each_blocks = update_keyed_each(each_blocks, dirty, get_key, 1, ctx2, each_value_1, each_1_lookup, div1, destroy_block, create_each_block_14, null, get_each_context_14);
+        }
+      },
+      d(detaching) {
+        if (detaching) {
+          detach(div2);
+        }
+        for (let i = 0; i < each_blocks.length; i += 1) {
+          each_blocks[i].d();
+        }
+        mounted = false;
+        dispose();
+      }
     };
   }
+  function create_each_block_14(key_1, ctx) {
+    let div2;
+    let div0;
+    let t0_value = (
+      /*s*/
+      (ctx[40].title || "Untitled") + ""
+    );
+    let t0;
+    let t1;
+    let div1;
+    let span0;
+    let t2_value = (
+      /*s*/
+      ctx[40].messageCount + ""
+    );
+    let t2;
+    let t3;
+    let t4;
+    let span1;
+    let t5_value = formatDate(
+      /*s*/
+      ctx[40].updatedAt
+    ) + "";
+    let t5;
+    let t6;
+    let button;
+    let t7;
+    let mounted;
+    let dispose;
+    function click_handler(...args) {
+      return (
+        /*click_handler*/
+        ctx[20](
+          /*s*/
+          ctx[40],
+          ...args
+        )
+      );
+    }
+    function click_handler_1() {
+      return (
+        /*click_handler_1*/
+        ctx[21](
+          /*s*/
+          ctx[40]
+        )
+      );
+    }
+    function keydown_handler(...args) {
+      return (
+        /*keydown_handler*/
+        ctx[22](
+          /*s*/
+          ctx[40],
+          ...args
+        )
+      );
+    }
+    return {
+      key: key_1,
+      first: null,
+      c() {
+        div2 = element("div");
+        div0 = element("div");
+        t0 = text(t0_value);
+        t1 = space();
+        div1 = element("div");
+        span0 = element("span");
+        t2 = text(t2_value);
+        t3 = text(" msg");
+        t4 = space();
+        span1 = element("span");
+        t5 = text(t5_value);
+        t6 = space();
+        button = element("button");
+        button.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`;
+        t7 = space();
+        attr(div0, "class", "agent-session-item-title");
+        attr(div1, "class", "agent-session-item-meta");
+        attr(button, "class", "agent-session-delete");
+        attr(button, "title", "Delete");
+        attr(div2, "class", "agent-session-item");
+        attr(div2, "role", "button");
+        attr(div2, "tabindex", "0");
+        toggle_class(
+          div2,
+          "active",
+          /*s*/
+          ctx[40].id === /*currentSessionId*/
+          ctx[3]
+        );
+        this.first = div2;
+      },
+      m(target, anchor) {
+        insert(target, div2, anchor);
+        append(div2, div0);
+        append(div0, t0);
+        append(div2, t1);
+        append(div2, div1);
+        append(div1, span0);
+        append(span0, t2);
+        append(span0, t3);
+        append(div1, t4);
+        append(div1, span1);
+        append(span1, t5);
+        append(div2, t6);
+        append(div2, button);
+        append(div2, t7);
+        if (!mounted) {
+          dispose = [
+            listen(button, "click", click_handler),
+            listen(div2, "click", click_handler_1),
+            listen(div2, "keydown", keydown_handler)
+          ];
+          mounted = true;
+        }
+      },
+      p(new_ctx, dirty) {
+        ctx = new_ctx;
+        if (dirty[0] & /*sessions*/
+        128 && t0_value !== (t0_value = /*s*/
+        (ctx[40].title || "Untitled") + ""))
+          set_data(t0, t0_value);
+        if (dirty[0] & /*sessions*/
+        128 && t2_value !== (t2_value = /*s*/
+        ctx[40].messageCount + ""))
+          set_data(t2, t2_value);
+        if (dirty[0] & /*sessions*/
+        128 && t5_value !== (t5_value = formatDate(
+          /*s*/
+          ctx[40].updatedAt
+        ) + ""))
+          set_data(t5, t5_value);
+        if (dirty[0] & /*sessions, currentSessionId*/
+        136) {
+          toggle_class(
+            div2,
+            "active",
+            /*s*/
+            ctx[40].id === /*currentSessionId*/
+            ctx[3]
+          );
+        }
+      },
+      d(detaching) {
+        if (detaching) {
+          detach(div2);
+        }
+        mounted = false;
+        run_all(dispose);
+      }
+    };
+  }
+  function create_if_block_64(ctx) {
+    let div;
+    return {
+      c() {
+        div = element("div");
+        div.textContent = `${PLACEHOLDER}`;
+        attr(div, "class", "agent-chat-placeholder");
+      },
+      m(target, anchor) {
+        insert(target, div, anchor);
+      },
+      p: noop,
+      d(detaching) {
+        if (detaching) {
+          detach(div);
+        }
+      }
+    };
+  }
+  function create_if_block_54(ctx) {
+    let div1;
+    let div0;
+    let t_value = (
+      /*msg*/
+      ctx[37].content + ""
+    );
+    let t;
+    return {
+      c() {
+        div1 = element("div");
+        div0 = element("div");
+        t = text(t_value);
+        attr(div0, "class", "agent-chat-message-body");
+        attr(div1, "class", "agent-chat-message agent-chat-message--error");
+      },
+      m(target, anchor) {
+        insert(target, div1, anchor);
+        append(div1, div0);
+        append(div0, t);
+      },
+      p(ctx2, dirty) {
+        if (dirty[0] & /*messages*/
+        2 && t_value !== (t_value = /*msg*/
+        ctx2[37].content + ""))
+          set_data(t, t_value);
+      },
+      d(detaching) {
+        if (detaching) {
+          detach(div1);
+        }
+      }
+    };
+  }
+  function create_if_block_38(ctx) {
+    let div2;
+    let div0;
+    let t1;
+    let div1;
+    let raw_value = (
+      /*msg*/
+      ctx[37].html + ""
+    );
+    let t2;
+    let if_block = (
+      /*msg*/
+      ctx[37].subgraph && create_if_block_46(ctx)
+    );
+    return {
+      c() {
+        div2 = element("div");
+        div0 = element("div");
+        div0.innerHTML = `<span class="agent-chat-message-role">Agent</span>`;
+        t1 = space();
+        div1 = element("div");
+        t2 = space();
+        if (if_block)
+          if_block.c();
+        attr(div0, "class", "agent-chat-message-header");
+        attr(div1, "class", "agent-chat-message-body");
+        attr(div2, "class", "agent-chat-message agent-chat-message--agent");
+      },
+      m(target, anchor) {
+        insert(target, div2, anchor);
+        append(div2, div0);
+        append(div2, t1);
+        append(div2, div1);
+        div1.innerHTML = raw_value;
+        append(div2, t2);
+        if (if_block)
+          if_block.m(div2, null);
+      },
+      p(ctx2, dirty) {
+        if (dirty[0] & /*messages*/
+        2 && raw_value !== (raw_value = /*msg*/
+        ctx2[37].html + ""))
+          div1.innerHTML = raw_value;
+        ;
+        if (
+          /*msg*/
+          ctx2[37].subgraph
+        ) {
+          if (if_block) {
+            if_block.p(ctx2, dirty);
+          } else {
+            if_block = create_if_block_46(ctx2);
+            if_block.c();
+            if_block.m(div2, null);
+          }
+        } else if (if_block) {
+          if_block.d(1);
+          if_block = null;
+        }
+      },
+      d(detaching) {
+        if (detaching) {
+          detach(div2);
+        }
+        if (if_block)
+          if_block.d();
+      }
+    };
+  }
+  function create_if_block_29(ctx) {
+    let div1;
+    let div0;
+    let t_value = (
+      /*msg*/
+      ctx[37].content + ""
+    );
+    let t;
+    return {
+      c() {
+        div1 = element("div");
+        div0 = element("div");
+        t = text(t_value);
+        attr(div0, "class", "agent-chat-message-body");
+        attr(div1, "class", "agent-chat-message agent-chat-message--user");
+      },
+      m(target, anchor) {
+        insert(target, div1, anchor);
+        append(div1, div0);
+        append(div0, t);
+      },
+      p(ctx2, dirty) {
+        if (dirty[0] & /*messages*/
+        2 && t_value !== (t_value = /*msg*/
+        ctx2[37].content + ""))
+          set_data(t, t_value);
+      },
+      d(detaching) {
+        if (detaching) {
+          detach(div1);
+        }
+      }
+    };
+  }
+  function create_if_block_46(ctx) {
+    let button;
+    let mounted;
+    let dispose;
+    function click_handler_2() {
+      return (
+        /*click_handler_2*/
+        ctx[23](
+          /*msg*/
+          ctx[37]
+        )
+      );
+    }
+    return {
+      c() {
+        button = element("button");
+        button.textContent = "Open Graph";
+        attr(button, "class", "agent-open-graph-btn");
+      },
+      m(target, anchor) {
+        insert(target, button, anchor);
+        if (!mounted) {
+          dispose = listen(button, "click", click_handler_2);
+          mounted = true;
+        }
+      },
+      p(new_ctx, dirty) {
+        ctx = new_ctx;
+      },
+      d(detaching) {
+        if (detaching) {
+          detach(button);
+        }
+        mounted = false;
+        dispose();
+      }
+    };
+  }
+  function create_each_block10(key_1, ctx) {
+    let first;
+    let if_block_anchor;
+    function select_block_type(ctx2, dirty) {
+      if (
+        /*msg*/
+        ctx2[37].role === "user"
+      )
+        return create_if_block_29;
+      if (
+        /*msg*/
+        ctx2[37].role === "agent"
+      )
+        return create_if_block_38;
+      if (
+        /*msg*/
+        ctx2[37].role === "error"
+      )
+        return create_if_block_54;
+    }
+    let current_block_type = select_block_type(ctx, [-1, -1]);
+    let if_block = current_block_type && current_block_type(ctx);
+    return {
+      key: key_1,
+      first: null,
+      c() {
+        first = empty();
+        if (if_block)
+          if_block.c();
+        if_block_anchor = empty();
+        this.first = first;
+      },
+      m(target, anchor) {
+        insert(target, first, anchor);
+        if (if_block)
+          if_block.m(target, anchor);
+        insert(target, if_block_anchor, anchor);
+      },
+      p(new_ctx, dirty) {
+        ctx = new_ctx;
+        if (current_block_type === (current_block_type = select_block_type(ctx, dirty)) && if_block) {
+          if_block.p(ctx, dirty);
+        } else {
+          if (if_block)
+            if_block.d(1);
+          if_block = current_block_type && current_block_type(ctx);
+          if (if_block) {
+            if_block.c();
+            if_block.m(if_block_anchor.parentNode, if_block_anchor);
+          }
+        }
+      },
+      d(detaching) {
+        if (detaching) {
+          detach(first);
+          detach(if_block_anchor);
+        }
+        if (if_block) {
+          if_block.d(detaching);
+        }
+      }
+    };
+  }
+  function create_if_block17(ctx) {
+    let if_block_anchor;
+    function select_block_type_1(ctx2, dirty) {
+      if (
+        /*loadingHtml*/
+        ctx2[0]
+      )
+        return create_if_block_113;
+      return create_else_block8;
+    }
+    let current_block_type = select_block_type_1(ctx, [-1, -1]);
+    let if_block = current_block_type(ctx);
+    return {
+      c() {
+        if_block.c();
+        if_block_anchor = empty();
+      },
+      m(target, anchor) {
+        if_block.m(target, anchor);
+        insert(target, if_block_anchor, anchor);
+      },
+      p(ctx2, dirty) {
+        if (current_block_type === (current_block_type = select_block_type_1(ctx2, dirty)) && if_block) {
+          if_block.p(ctx2, dirty);
+        } else {
+          if_block.d(1);
+          if_block = current_block_type(ctx2);
+          if (if_block) {
+            if_block.c();
+            if_block.m(if_block_anchor.parentNode, if_block_anchor);
+          }
+        }
+      },
+      d(detaching) {
+        if (detaching) {
+          detach(if_block_anchor);
+        }
+        if_block.d(detaching);
+      }
+    };
+  }
+  function create_else_block8(ctx) {
+    let div;
+    return {
+      c() {
+        div = element("div");
+        div.textContent = "Agent is thinking...";
+        attr(div, "class", "agent-chat-loading");
+      },
+      m(target, anchor) {
+        insert(target, div, anchor);
+      },
+      p: noop,
+      d(detaching) {
+        if (detaching) {
+          detach(div);
+        }
+      }
+    };
+  }
+  function create_if_block_113(ctx) {
+    let html_tag;
+    let html_anchor;
+    return {
+      c() {
+        html_tag = new HtmlTag(false);
+        html_anchor = empty();
+        html_tag.a = html_anchor;
+      },
+      m(target, anchor) {
+        html_tag.m(
+          /*loadingHtml*/
+          ctx[0],
+          target,
+          anchor
+        );
+        insert(target, html_anchor, anchor);
+      },
+      p(ctx2, dirty) {
+        if (dirty[0] & /*loadingHtml*/
+        1)
+          html_tag.p(
+            /*loadingHtml*/
+            ctx2[0]
+          );
+      },
+      d(detaching) {
+        if (detaching) {
+          detach(html_anchor);
+          html_tag.d();
+        }
+      }
+    };
+  }
+  function create_fragment47(ctx) {
+    let div5;
+    let div1;
+    let div0;
+    let button0;
+    let t0;
+    let button1;
+    let t1;
+    let h3;
+    let t2;
+    let t3;
+    let div3;
+    let t4;
+    let div2;
+    let t5;
+    let each_blocks = [];
+    let each_1_lookup = /* @__PURE__ */ new Map();
+    let t6;
+    let t7;
+    let div4;
+    let textarea;
+    let t8;
+    let button2;
+    let t9;
+    let mounted;
+    let dispose;
+    let if_block0 = (
+      /*showSessions*/
+      ctx[8] && create_if_block_74(ctx)
+    );
+    let if_block1 = (
+      /*messages*/
+      ctx[1].length === 0 && create_if_block_64(ctx)
+    );
+    let each_value = ensure_array_like(
+      /*messages*/
+      ctx[1]
+    );
+    const get_key = (ctx2) => (
+      /*msg*/
+      ctx2[37] === /*messages*/
+      ctx2[1][
+        /*messages*/
+        ctx2[1].length - 1
+      ] ? null : Math.random()
+    );
+    for (let i = 0; i < each_value.length; i += 1) {
+      let child_ctx = get_each_context10(ctx, each_value, i);
+      let key = get_key(child_ctx);
+      each_1_lookup.set(key, each_blocks[i] = create_each_block10(key, child_ctx));
+    }
+    let if_block2 = (
+      /*loading*/
+      ctx[5] && create_if_block17(ctx)
+    );
+    return {
+      c() {
+        div5 = element("div");
+        div1 = element("div");
+        div0 = element("div");
+        button0 = element("button");
+        button0.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"></line><line x1="4" y1="12" x2="20" y2="12"></line><line x1="4" y1="18" x2="20" y2="18"></line></svg>`;
+        t0 = space();
+        button1 = element("button");
+        button1.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>`;
+        t1 = space();
+        h3 = element("h3");
+        t2 = text(
+          /*sessionTitle*/
+          ctx[6]
+        );
+        t3 = space();
+        div3 = element("div");
+        if (if_block0)
+          if_block0.c();
+        t4 = space();
+        div2 = element("div");
+        if (if_block1)
+          if_block1.c();
+        t5 = space();
+        for (let i = 0; i < each_blocks.length; i += 1) {
+          each_blocks[i].c();
+        }
+        t6 = space();
+        if (if_block2)
+          if_block2.c();
+        t7 = space();
+        div4 = element("div");
+        textarea = element("textarea");
+        t8 = space();
+        button2 = element("button");
+        t9 = text("Send");
+        attr(button0, "class", "agent-chat-sessions-btn");
+        attr(button0, "title", "Sessions");
+        attr(button1, "class", "agent-chat-new-btn");
+        attr(button1, "title", "New Chat");
+        attr(div0, "class", "agent-chat-header-left");
+        attr(div1, "class", "agent-chat-header");
+        attr(div2, "class", "agent-chat-messages");
+        attr(div2, "role", "log");
+        attr(div2, "tabindex", "0");
+        attr(div3, "class", "agent-chat-body");
+        attr(textarea, "class", "agent-chat-input");
+        attr(textarea, "rows", "3");
+        attr(textarea, "placeholder", PLACEHOLDER);
+        attr(button2, "class", "agent-chat-send-button");
+        button2.disabled = /*loading*/
+        ctx[5];
+        attr(div4, "class", "agent-chat-input-area");
+        attr(div5, "class", "agent-chat-container");
+      },
+      m(target, anchor) {
+        insert(target, div5, anchor);
+        append(div5, div1);
+        append(div1, div0);
+        append(div0, button0);
+        append(div0, t0);
+        append(div0, button1);
+        append(div0, t1);
+        append(div0, h3);
+        append(h3, t2);
+        append(div5, t3);
+        append(div5, div3);
+        if (if_block0)
+          if_block0.m(div3, null);
+        append(div3, t4);
+        append(div3, div2);
+        if (if_block1)
+          if_block1.m(div2, null);
+        append(div2, t5);
+        for (let i = 0; i < each_blocks.length; i += 1) {
+          if (each_blocks[i]) {
+            each_blocks[i].m(div2, null);
+          }
+        }
+        append(div2, t6);
+        if (if_block2)
+          if_block2.m(div2, null);
+        ctx[24](div2);
+        append(div5, t7);
+        append(div5, div4);
+        append(div4, textarea);
+        set_input_value(
+          textarea,
+          /*input*/
+          ctx[4]
+        );
+        append(div4, t8);
+        append(div4, button2);
+        append(button2, t9);
+        if (!mounted) {
+          dispose = [
+            listen(
+              button0,
+              "click",
+              /*toggleSessions*/
+              ctx[12]
+            ),
+            listen(
+              button1,
+              "click",
+              /*newChat*/
+              ctx[11]
+            ),
+            listen(
+              div2,
+              "click",
+              /*handleLinkClick*/
+              ctx[13]
+            ),
+            listen(div2, "keydown", keydown_handler_1),
+            listen(
+              textarea,
+              "input",
+              /*textarea_input_handler*/
+              ctx[25]
+            ),
+            listen(
+              textarea,
+              "keydown",
+              /*onKeydown*/
+              ctx[15]
+            ),
+            listen(
+              button2,
+              "click",
+              /*sendMessage*/
+              ctx[14]
+            )
+          ];
+          mounted = true;
+        }
+      },
+      p(ctx2, dirty) {
+        if (dirty[0] & /*sessionTitle*/
+        64)
+          set_data(
+            t2,
+            /*sessionTitle*/
+            ctx2[6]
+          );
+        if (
+          /*showSessions*/
+          ctx2[8]
+        ) {
+          if (if_block0) {
+            if_block0.p(ctx2, dirty);
+          } else {
+            if_block0 = create_if_block_74(ctx2);
+            if_block0.c();
+            if_block0.m(div3, t4);
+          }
+        } else if (if_block0) {
+          if_block0.d(1);
+          if_block0 = null;
+        }
+        if (
+          /*messages*/
+          ctx2[1].length === 0
+        ) {
+          if (if_block1) {
+            if_block1.p(ctx2, dirty);
+          } else {
+            if_block1 = create_if_block_64(ctx2);
+            if_block1.c();
+            if_block1.m(div2, t5);
+          }
+        } else if (if_block1) {
+          if_block1.d(1);
+          if_block1 = null;
+        }
+        if (dirty[0] & /*messages, showGraph*/
+        65538) {
+          each_value = ensure_array_like(
+            /*messages*/
+            ctx2[1]
+          );
+          each_blocks = update_keyed_each(each_blocks, dirty, get_key, 1, ctx2, each_value, each_1_lookup, div2, destroy_block, create_each_block10, t6, get_each_context10);
+        }
+        if (
+          /*loading*/
+          ctx2[5]
+        ) {
+          if (if_block2) {
+            if_block2.p(ctx2, dirty);
+          } else {
+            if_block2 = create_if_block17(ctx2);
+            if_block2.c();
+            if_block2.m(div2, null);
+          }
+        } else if (if_block2) {
+          if_block2.d(1);
+          if_block2 = null;
+        }
+        if (dirty[0] & /*input*/
+        16) {
+          set_input_value(
+            textarea,
+            /*input*/
+            ctx2[4]
+          );
+        }
+        if (dirty[0] & /*loading*/
+        32) {
+          button2.disabled = /*loading*/
+          ctx2[5];
+        }
+      },
+      i: noop,
+      o: noop,
+      d(detaching) {
+        if (detaching) {
+          detach(div5);
+        }
+        if (if_block0)
+          if_block0.d();
+        if (if_block1)
+          if_block1.d();
+        for (let i = 0; i < each_blocks.length; i += 1) {
+          each_blocks[i].d();
+        }
+        if (if_block2)
+          if_block2.d();
+        ctx[24](null);
+        mounted = false;
+        run_all(dispose);
+      }
+    };
+  }
+  var API = "/api/ext/agent";
+  var PLACEHOLDER = "Ask a question about materials, experiments, properties...";
+  function formatDate(iso) {
+    if (!iso)
+      return "";
+    const d = new Date(iso);
+    const now3 = /* @__PURE__ */ new Date();
+    const diff = now3 - d;
+    if (diff < 36e5)
+      return `${Math.floor(diff / 6e4)}m ago`;
+    if (diff < 864e5)
+      return `${Math.floor(diff / 36e5)}h ago`;
+    return d.toLocaleDateString();
+  }
+  var keydown_handler_1 = () => {
+  };
+  function instance47($$self, $$props, $$invalidate) {
+    let { linkHandler = null } = $$props;
+    let { graphHandler = null } = $$props;
+    let { loadingHtml = null } = $$props;
+    let messages = [];
+    let input = "";
+    let loading = false;
+    let messagesEl;
+    let currentSessionId = null;
+    let sessionTitle = "New Chat";
+    let sessions = [];
+    let showSessions = false;
+    let sessionLoaded = false;
+    let saveTimer = null;
+    async function initSessions() {
+      try {
+        const res = await fetch(`${API}/sessions`);
+        if (!res.ok)
+          return;
+        $$invalidate(7, sessions = await res.json());
+        if (sessions.length > 0) {
+          await loadSession(sessions[0].id);
+        } else {
+          await createSession();
+        }
+      } catch {
+        await createSession();
+      }
+    }
+    async function createSession() {
+      try {
+        const res = await fetch(`${API}/sessions`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: "New Chat" })
+        });
+        if (!res.ok)
+          return;
+        const s = await res.json();
+        $$invalidate(3, currentSessionId = s.id);
+        $$invalidate(6, sessionTitle = s.title);
+        $$invalidate(1, messages = []);
+        $$invalidate(19, sessionLoaded = true);
+      } catch {
+      }
+    }
+    async function loadSession(id2) {
+      try {
+        const res = await fetch(`${API}/sessions/${id2}`);
+        if (!res.ok)
+          return;
+        const s = await res.json();
+        $$invalidate(3, currentSessionId = s.id);
+        $$invalidate(6, sessionTitle = s.title || "Untitled");
+        $$invalidate(1, messages = s.messages || []);
+        $$invalidate(19, sessionLoaded = true);
+        $$invalidate(8, showSessions = false);
+      } catch {
+      }
+    }
+    function scheduleSave() {
+      if (saveTimer)
+        clearTimeout(saveTimer);
+      saveTimer = setTimeout(saveSession, 500);
+    }
+    async function saveSession() {
+      if (!currentSessionId)
+        return;
+      try {
+        await fetch(`${API}/sessions/${currentSessionId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ messages, title: sessionTitle })
+        });
+      } catch {
+      }
+    }
+    async function deleteSession(id2, e) {
+      e.stopPropagation();
+      try {
+        await fetch(`${API}/sessions/${id2}`, { method: "DELETE" });
+        $$invalidate(7, sessions = sessions.filter((s) => s.id !== id2));
+        if (id2 === currentSessionId) {
+          if (sessions.length > 0) {
+            await loadSession(sessions[0].id);
+          } else {
+            await createSession();
+          }
+        }
+      } catch {
+      }
+    }
+    async function newChat() {
+      await createSession();
+      await fetchSessions();
+      $$invalidate(8, showSessions = false);
+    }
+    async function fetchSessions() {
+      try {
+        const res = await fetch(`${API}/sessions`);
+        if (res.ok)
+          $$invalidate(7, sessions = await res.json());
+      } catch {
+      }
+    }
+    function toggleSessions() {
+      $$invalidate(8, showSessions = !showSessions);
+      if (showSessions)
+        fetchSessions();
+    }
+    function openLink(path, quote) {
+      var _a, _b, _c, _d;
+      if (linkHandler) {
+        linkHandler(path, quote || null);
+      } else if ((_d = (_c = (_b = (_a = window.__ignis) == null ? void 0 : _a.obsidian) == null ? void 0 : _b.app) == null ? void 0 : _c.workspace) == null ? void 0 : _d.openLinkText) {
+        window.__ignis.obsidian.app.workspace.openLinkText(path, quote || "", false);
+      }
+    }
+    function handleLinkClick(e) {
+      const target = e.target;
+      if (target.classList.contains("agent-link")) {
+        const path = target.getAttribute("data-path");
+        if (path) {
+          e.preventDefault();
+          openLink(path, target.getAttribute("data-quote"));
+        }
+      }
+    }
+    function buildHistory(maxPairs = 5) {
+      const pairs = [];
+      for (let i = messages.length - 1; i >= 0 && pairs.length < maxPairs; i--) {
+        if (messages[i].role === "agent") {
+          const userMsg = i > 0 && messages[i - 1].role === "user" ? messages[i - 1] : null;
+          if (userMsg) {
+            pairs.unshift({
+              user: userMsg.content,
+              agent: messages[i].content
+            });
+            i--;
+          }
+        }
+      }
+      if (pairs.length === 0)
+        return "";
+      let ctx = "";
+      for (const p of pairs) {
+        ctx += `Q: ${p.user}
+A: ${p.agent}
+
+`;
+      }
+      return ctx.trimEnd();
+    }
+    async function sendMessage() {
+      const query = input.trim();
+      if (!query || loading)
+        return;
+      console.log("[agent] sendMessage:", query);
+      stopCharAnim();
+      if (messages.length === 0 && sessionTitle === "New Chat") {
+        $$invalidate(6, sessionTitle = query.slice(0, 40) + (query.length > 40 ? "..." : ""));
+      }
+      $$invalidate(1, messages = [...messages, { role: "user", content: query }]);
+      $$invalidate(4, input = "");
+      $$invalidate(5, loading = true);
+      const history2 = buildHistory();
+      const enhancedQuery = history2 ? `${history2}
+Current: ${query}` : query;
+      try {
+        const res = await fetch(`${API}/query`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query: enhancedQuery })
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || `Server error (${res.status})`);
+        }
+        const contentType = res.headers.get("content-type") || "";
+        console.log("[agent] response:", res.status, contentType);
+        if (contentType.includes("text/event-stream")) {
+          await handleSSE(res);
+        } else {
+          const data = await res.json();
+          const html = renderResponse(data);
+          $$invalidate(1, messages = [
+            ...messages,
+            {
+              role: "agent",
+              content: data.answer,
+              html
+            }
+          ]);
+        }
+      } catch (err) {
+        console.error("[agent] error:", err.message || err);
+        $$invalidate(1, messages = [
+          ...messages,
+          {
+            role: "error",
+            content: err.message || "Unknown error"
+          }
+        ]);
+      } finally {
+        $$invalidate(5, loading = false);
+      }
+    }
+    let charTimer = null;
+    function stopCharAnim() {
+      if (charTimer) {
+        clearTimeout(charTimer);
+        charTimer = null;
+      }
+    }
+    async function handleSSE(res) {
+      var _a, _b;
+      console.log("[agent] handleSSE started");
+      stopCharAnim();
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+      let eventType = "";
+      let fullAnswer = "";
+      let pendingChars = "";
+      let citations = [];
+      let subgraph = { nodes: [], edges: [] };
+      let hasError = false;
+      let streaming = true;
+      $$invalidate(1, messages = [...messages, { role: "agent", content: "", html: "" }]);
+      const agentIdx = messages.length - 1;
+      const before = messages.slice(0, agentIdx);
+      function tickDelay(n) {
+        if (n <= 0)
+          return 60;
+        if (n <= 3)
+          return 45;
+        if (n <= 8)
+          return 30;
+        if (n <= 20)
+          return 18;
+        if (n <= 60)
+          return 12;
+        return 8;
+      }
+      function tick2() {
+        if (pendingChars.length > 0) {
+          fullAnswer += pendingChars[0];
+          pendingChars = pendingChars.slice(1);
+          const html = `<div class="agent-block agent-block--answer">${parseMarkdown(fullAnswer)}<span class="agent-cursor">|</span></div>`;
+          $$invalidate(1, messages = [...before, { role: "agent", content: fullAnswer, html }]);
+          charTimer = setTimeout(tick2, tickDelay(pendingChars.length));
+        } else if (streaming) {
+          charTimer = setTimeout(tick2, tickDelay(0));
+        } else {
+          charTimer = null;
+        }
+      }
+      tick2();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
+          streaming = false;
+          break;
+        }
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split("\n");
+        buf = lines.pop() || "";
+        for (const line of lines) {
+          if (line.startsWith("event: ")) {
+            eventType = line.slice(7).trim();
+          } else if (line.startsWith("data: ")) {
+            try {
+              const payload = JSON.parse(line.slice(6));
+              switch (eventType) {
+                case "plan":
+                  console.log("[agent] plan event:", payload == null ? void 0 : payload.intent);
+                  break;
+                case "token": {
+                  const text2 = typeof payload === "string" ? payload : String(payload);
+                  pendingChars += text2;
+                  break;
+                }
+                case "citations":
+                  citations = Array.isArray(payload) ? payload : [];
+                  break;
+                case "subgraph":
+                  subgraph = payload && payload.nodes ? payload : { nodes: [], edges: [] };
+                  console.log("[agent] subgraph event:", (_a = subgraph.nodes) == null ? void 0 : _a.length, "nodes", (_b = subgraph.edges) == null ? void 0 : _b.length, "edges");
+                  break;
+                case "done":
+                  console.log("[agent] done event:", payload);
+                  break;
+                case "error":
+                  hasError = true;
+                  streaming = false;
+                  const errText = typeof payload === "string" ? payload : (payload == null ? void 0 : payload.message) || "Backend error";
+                  $$invalidate(1, messages = [...before, { role: "error", content: errText }]);
+                  break;
+              }
+            } catch {
+            }
+          }
+        }
+      }
+      while (charTimer || pendingChars.length > 0) {
+        await new Promise((r) => setTimeout(r, 30));
+      }
+      if (!hasError) {
+        const html = renderFromBackend(fullAnswer, subgraph, citations);
+        const showGraph2 = subgraph.nodes && subgraph.nodes.length > 0;
+        console.log("[agent] final render: nodes=" + subgraph.nodes.length, "edges=" + subgraph.edges.length, "showGraph=" + showGraph2);
+        $$invalidate(1, messages = [
+          ...before,
+          {
+            role: "agent",
+            content: fullAnswer,
+            html,
+            subgraph: showGraph2 ? subgraph : null
+          }
+        ]);
+      }
+    }
+    function onKeydown(e) {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    }
+    function showGraph(subgraph) {
+      if (graphHandler)
+        graphHandler(subgraph);
+    }
+    initSessions();
+    console.log("[agent] ChatView mounted");
+    const click_handler = (s, e) => deleteSession(s.id, e);
+    const click_handler_1 = (s) => loadSession(s.id);
+    const keydown_handler = (s, e) => {
+      if (e.key === "Enter")
+        loadSession(s.id);
+    };
+    const click_handler_2 = (msg) => showGraph(msg.subgraph);
+    function div2_binding($$value) {
+      binding_callbacks[$$value ? "unshift" : "push"](() => {
+        messagesEl = $$value;
+        $$invalidate(2, messagesEl), $$invalidate(1, messages);
+      });
+    }
+    function textarea_input_handler() {
+      input = this.value;
+      $$invalidate(4, input);
+    }
+    $$self.$$set = ($$props2) => {
+      if ("linkHandler" in $$props2)
+        $$invalidate(17, linkHandler = $$props2.linkHandler);
+      if ("graphHandler" in $$props2)
+        $$invalidate(18, graphHandler = $$props2.graphHandler);
+      if ("loadingHtml" in $$props2)
+        $$invalidate(0, loadingHtml = $$props2.loadingHtml);
+    };
+    $$self.$$.update = () => {
+      if ($$self.$$.dirty[0] & /*messagesEl, messages*/
+      6) {
+        $:
+          if (messagesEl && messages.length > 0) {
+            $$invalidate(2, messagesEl.scrollTop = messagesEl.scrollHeight, messagesEl);
+          }
+      }
+      if ($$self.$$.dirty[0] & /*sessionLoaded, currentSessionId, messages*/
+      524298) {
+        $:
+          if (sessionLoaded && currentSessionId && messages) {
+            scheduleSave();
+          }
+      }
+    };
+    return [
+      loadingHtml,
+      messages,
+      messagesEl,
+      currentSessionId,
+      input,
+      loading,
+      sessionTitle,
+      sessions,
+      showSessions,
+      loadSession,
+      deleteSession,
+      newChat,
+      toggleSessions,
+      handleLinkClick,
+      sendMessage,
+      onKeydown,
+      showGraph,
+      linkHandler,
+      graphHandler,
+      sessionLoaded,
+      click_handler,
+      click_handler_1,
+      keydown_handler,
+      click_handler_2,
+      div2_binding,
+      textarea_input_handler
+    ];
+  }
+  var ChatView = class extends SvelteComponent {
+    constructor(options) {
+      super();
+      init(
+        this,
+        options,
+        instance47,
+        create_fragment47,
+        safe_not_equal,
+        {
+          linkHandler: 17,
+          graphHandler: 18,
+          loadingHtml: 0
+        },
+        add_css21,
+        [-1, -1]
+      );
+    }
+  };
+  var ChatView_default = ChatView;
 
   // node_modules/d3-dispatch/src/dispatch.js
   var noop2 = { value: () => {
   } };
-  function dispatch2() {
+  function dispatch() {
     for (var i = 0, n = arguments.length, _ = {}, t; i < n; ++i) {
       if (!(t = arguments[i] + "") || t in _ || /[\s.]/.test(t))
         throw new Error("illegal type: " + t);
@@ -21079,7 +22166,7 @@ ${block.trim()}
       return { type: t, name };
     });
   }
-  Dispatch.prototype = dispatch2.prototype = {
+  Dispatch.prototype = dispatch.prototype = {
     constructor: Dispatch,
     on: function(typename, callback) {
       var _ = this._, T = parseTypenames(typename + "", _), t, i = -1, n = T.length;
@@ -21140,7 +22227,7 @@ ${block.trim()}
       type2.push({ name, value: callback });
     return type2;
   }
-  var dispatch_default = dispatch2;
+  var dispatch_default = dispatch;
 
   // node_modules/d3-selection/src/namespaces.js
   var xhtml = "http://www.w3.org/1999/xhtml";
@@ -22051,12 +23138,12 @@ ${block.trim()}
     subject,
     target,
     identifier,
-    active: active2,
+    active,
     x: x3,
     y: y3,
     dx,
     dy,
-    dispatch: dispatch3
+    dispatch: dispatch2
   }) {
     Object.defineProperties(this, {
       type: { value: type2, enumerable: true, configurable: true },
@@ -22064,12 +23151,12 @@ ${block.trim()}
       subject: { value: subject, enumerable: true, configurable: true },
       target: { value: target, enumerable: true, configurable: true },
       identifier: { value: identifier, enumerable: true, configurable: true },
-      active: { value: active2, enumerable: true, configurable: true },
+      active: { value: active, enumerable: true, configurable: true },
       x: { value: x3, enumerable: true, configurable: true },
       y: { value: y3, enumerable: true, configurable: true },
       dx: { value: dx, enumerable: true, configurable: true },
       dy: { value: dy, enumerable: true, configurable: true },
-      _: { value: dispatch3 }
+      _: { value: dispatch2 }
     });
   }
   DragEvent.prototype.on = function() {
@@ -22091,7 +23178,7 @@ ${block.trim()}
     return navigator.maxTouchPoints || "ontouchstart" in this;
   }
   function drag_default() {
-    var filter2 = defaultFilter, container = defaultContainer, subject = defaultSubject, touchable = defaultTouchable, gestures = {}, listeners = dispatch_default("start", "drag", "end"), active2 = 0, mousedownx, mousedowny, mousemoving, touchending, clickDistance2 = 0;
+    var filter2 = defaultFilter, container = defaultContainer, subject = defaultSubject, touchable = defaultTouchable, gestures = {}, listeners = dispatch_default("start", "drag", "end"), active = 0, mousedownx, mousedowny, mousemoving, touchending, clickDistance2 = 0;
     function drag(selection2) {
       selection2.on("mousedown.drag", mousedowned).filter(touchable).on("touchstart.drag", touchstarted).on("touchmove.drag", touchmoved, nonpassive).on("touchend.drag touchcancel.drag", touchended).style("touch-action", "none").style("-webkit-tap-highlight-color", "rgba(0,0,0,0)");
     }
@@ -22158,17 +23245,17 @@ ${block.trim()}
       }
     }
     function beforestart(that, container2, event, d, identifier, touch) {
-      var dispatch3 = listeners.copy(), p = pointer_default(touch || event, container2), dx, dy, s;
+      var dispatch2 = listeners.copy(), p = pointer_default(touch || event, container2), dx, dy, s;
       if ((s = subject.call(that, new DragEvent("beforestart", {
         sourceEvent: event,
         target: drag,
         identifier,
-        active: active2,
+        active,
         x: p[0],
         y: p[1],
         dx: 0,
         dy: 0,
-        dispatch: dispatch3
+        dispatch: dispatch2
       }), d)) == null)
         return;
       dx = s.x - p[0] || 0;
@@ -22177,15 +23264,15 @@ ${block.trim()}
         var p0 = p, n;
         switch (type2) {
           case "start":
-            gestures[identifier] = gesture, n = active2++;
+            gestures[identifier] = gesture, n = active++;
             break;
           case "end":
-            delete gestures[identifier], --active2;
+            delete gestures[identifier], --active;
           case "drag":
-            p = pointer_default(touch2 || event2, container2), n = active2;
+            p = pointer_default(touch2 || event2, container2), n = active;
             break;
         }
-        dispatch3.call(
+        dispatch2.call(
           type2,
           that,
           new DragEvent(type2, {
@@ -22198,7 +23285,7 @@ ${block.trim()}
             y: p[1] + dy,
             dx: p[0] - p0[0],
             dy: p[1] - p0[1],
-            dispatch: dispatch3
+            dispatch: dispatch2
           }),
           d
         );
@@ -23129,7 +24216,7 @@ ${block.trim()}
 
   // node_modules/d3-transition/src/interrupt.js
   function interrupt_default(node, name) {
-    var schedules = node.__transition, schedule, active2, empty3 = true, i;
+    var schedules = node.__transition, schedule, active, empty3 = true, i;
     if (!schedules)
       return;
     name = name == null ? null : name + "";
@@ -23138,10 +24225,10 @@ ${block.trim()}
         empty3 = false;
         continue;
       }
-      active2 = schedule.state > STARTING && schedule.state < ENDING;
+      active = schedule.state > STARTING && schedule.state < ENDING;
       schedule.state = ENDED;
       schedule.timer.stop();
-      schedule.on.call(active2 ? "interrupt" : "cancel", node, node.__data__, schedule.index, schedule.group);
+      schedule.on.call(active ? "interrupt" : "cancel", node, node.__data__, schedule.index, schedule.group);
       delete schedules[i];
     }
     if (empty3)
@@ -23701,7 +24788,7 @@ ${block.trim()}
   };
 
   // node_modules/d3-ease/src/cubic.js
-  function cubicInOut2(t) {
+  function cubicInOut(t) {
     return ((t *= 2) <= 1 ? t * t * t : (t -= 2) * t * t + 2) / 2;
   }
 
@@ -23711,7 +24798,7 @@ ${block.trim()}
     // Set on use.
     delay: 0,
     duration: 250,
-    ease: cubicInOut2
+    ease: cubicInOut
   };
   function inherit(node, id2) {
     var timing;
@@ -24577,14 +25664,14 @@ ${block.trim()}
     sourceEvent,
     target,
     transform: transform2,
-    dispatch: dispatch3
+    dispatch: dispatch2
   }) {
     Object.defineProperties(this, {
       type: { value: type2, enumerable: true, configurable: true },
       sourceEvent: { value: sourceEvent, enumerable: true, configurable: true },
       target: { value: target, enumerable: true, configurable: true },
       transform: { value: transform2, enumerable: true, configurable: true },
-      _: { value: dispatch3 }
+      _: { value: dispatch2 }
     });
   }
 
@@ -24992,10 +26079,10 @@ ${block.trim()}
   }
 
   // packages/ui/src/views/agent/GraphPane.svelte
-  function add_css21(target) {
-    append_styles(target, "svelte-1lu4v8n", ".agent-graph-pane{margin-top:12px;border:1px solid var(--background-modifier-border);border-radius:6px;overflow:hidden;background:var(--background-primary)}");
+  function add_css22(target) {
+    append_styles(target, "svelte-wunf0q", ".agent-graph-pane{border:1px solid var(--background-modifier-border);border-radius:6px;overflow:hidden;background:var(--background-primary);width:100%;height:100%}");
   }
-  function create_fragment47(ctx) {
+  function create_fragment48(ctx) {
     let div;
     return {
       c() {
@@ -25018,12 +26105,10 @@ ${block.trim()}
       }
     };
   }
-  var WIDTH = 720;
-  var HEIGHT = 420;
   function nodeLabel(n) {
     return n.name || n.key || "?";
   }
-  function instance47($$self, $$props, $$invalidate) {
+  function instance48($$self, $$props, $$invalidate) {
     let { nodes = [] } = $$props;
     let { edges = [] } = $$props;
     let container;
@@ -25062,7 +26147,10 @@ ${block.trim()}
         sim = null;
       }
       $$invalidate(0, container.innerHTML = "", container);
-      const svg = select_default2(container).append("svg").attr("viewBox", `0 0 ${WIDTH} ${HEIGHT}`).style("width", "100%").style("height", `${HEIGHT}px`).style("background", "var(--background-primary)");
+      const rect = container.getBoundingClientRect();
+      const WIDTH = rect.width || 720;
+      const HEIGHT = rect.height || 420;
+      const svg = select_default2(container).append("svg").attr("viewBox", `0 0 ${WIDTH} ${HEIGHT}`).style("width", "100%").style("height", "100%").style("display", "block").style("background", "var(--background-primary)");
       const g = svg.append("g");
       const zoom = zoom_default2().scaleExtent([0.2, 4]).on("zoom", (ev) => g.attr("transform", ev.transform));
       svg.call(zoom);
@@ -25141,1494 +26229,10 @@ ${block.trim()}
   var GraphPane = class extends SvelteComponent {
     constructor(options) {
       super();
-      init(this, options, instance47, create_fragment47, safe_not_equal, { nodes: 1, edges: 2 }, add_css21);
+      init(this, options, instance48, create_fragment48, safe_not_equal, { nodes: 1, edges: 2 }, add_css22);
     }
   };
   var GraphPane_default = GraphPane;
-
-  // packages/ui/src/views/agent/ChatView.svelte
-  function add_css22(target) {
-    append_styles(target, "svelte-1ui6c79", ".agent-chat-container{display:flex;flex-direction:column;height:100%;overflow:hidden}.agent-chat-header{padding:8px 12px;border-bottom:1px solid var(--background-modifier-border);flex-shrink:0;display:flex;align-items:center;justify-content:space-between;gap:8px}.agent-chat-header-left{display:flex;align-items:center;gap:8px;min-width:0}.agent-chat-header h3{margin:0;font-size:0.95em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.agent-chat-sessions-btn{background:none;border:none;color:var(--text-muted);cursor:pointer;width:28px;height:28px;padding:0;border-radius:4px;display:flex;align-items:center;justify-content:center;flex-shrink:0}.agent-chat-sessions-btn:hover{color:var(--text-normal);background:var(--background-modifier-hover)}.agent-chat-new-btn{background:none;border:none;color:var(--text-muted);cursor:pointer;width:28px;height:28px;padding:0;border-radius:4px;display:flex;align-items:center;justify-content:center;flex-shrink:0}.agent-chat-new-btn:hover{color:var(--text-accent);background:var(--background-modifier-hover)}.agent-chat-body{display:flex;flex:1;min-height:0}.agent-sessions-panel{width:220px;flex-shrink:0;border-right:1px solid var(--background-modifier-border);display:flex;flex-direction:column;overflow:hidden}.agent-sessions-panel-header{padding:8px 12px;font-size:0.8em;font-weight:600;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.05em;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--background-modifier-border)}.agent-sessions-list{flex:1;overflow-y:auto;padding:4px}.agent-session-item{padding:8px 10px;border-radius:6px;cursor:pointer;position:relative}.agent-session-item:hover{background:var(--background-modifier-hover)}.agent-session-item.active{background:var(--background-modifier-hover)}.agent-session-item-title{font-size:0.85em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:20px}.agent-session-item-meta{font-size:0.72em;color:var(--text-muted);display:flex;gap:8px;margin-top:2px}.agent-session-delete{position:absolute;top:8px;right:6px;background:none;border:none;color:var(--text-muted);cursor:pointer;padding:2px;border-radius:3px;display:none}.agent-session-item:hover .agent-session-delete{display:flex}.agent-session-delete:hover{color:var(--text-error);background:var(--background-modifier-error)}.agent-chat-messages{flex:1;overflow-y:auto;padding:12px 16px;display:flex;flex-direction:column;gap:12px;user-select:text;-webkit-user-select:text}.agent-chat-placeholder{color:var(--text-muted);text-align:center;padding:24px 0;font-style:italic}.agent-chat-message{border-radius:8px;padding:8px 12px;max-width:90%;user-select:text;-webkit-user-select:text}.agent-chat-message--user{align-self:flex-end;background-color:var(--interactive-accent);color:var(--text-on-accent)}.agent-chat-message--agent{align-self:flex-start;background-color:var(--background-modifier-hover);border:1px solid var(--background-modifier-border);max-width:95%}.agent-chat-message--error{align-self:center;background-color:var(--background-modifier-error);color:var(--text-error);font-size:0.85em}.agent-chat-message-header{font-size:0.75em;opacity:0.7;margin-bottom:4px}.agent-chat-message-role{font-weight:600}.agent-chat-message-body{font-size:0.9em;line-height:1.5;word-break:break-word}.agent-chat-message-body a{color:var(--link-color);text-decoration:none}.agent-chat-message-body a:hover{text-decoration:underline}.agent-chat-loading{align-self:flex-start;color:var(--text-muted);font-style:italic;font-size:0.85em;padding:8px 12px}.agent-block{margin-top:10px}.agent-block--answer{margin-top:0}.agent-block--answer h2,.agent-block--answer h3,.agent-block--answer h4{margin:10px 0 4px;font-size:1em}.agent-block--answer h3{font-weight:700}.agent-block--answer h4{font-weight:600}.agent-block--answer p{margin:4px 0}.agent-block--answer ul,.agent-block--answer ol{margin:4px 0;padding-left:20px}.agent-block--answer li{margin:2px 0}.agent-block--answer code{background:var(--background-modifier-border);padding:1px 4px;border-radius:3px;font-size:0.85em}.agent-block--answer strong{font-weight:700}.agent-block--answer em{font-style:italic}.agent-block--answer hr{border:none;border-top:1px solid var(--background-modifier-border);margin:8px 0}.agent-block--answer a{color:var(--link-color);text-decoration:underline}.agent-block-label{font-weight:600;font-size:0.8em;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px;letter-spacing:0.05em}.agent-entity-list{display:flex;flex-wrap:wrap;gap:4px}.agent-entity{display:inline-block;padding:2px 8px;border-radius:4px;font-size:0.82em;font-weight:500}.agent-entity--material{background:rgba(78, 121, 167, 0.15);color:var(--text-accent)}.agent-entity--experiment{background:rgba(89, 161, 79, 0.15);color:#59a14f}.agent-entity--property{background:rgba(237, 201, 72, 0.15);color:#c9a90e}.agent-entity--regime{background:rgba(225, 87, 89, 0.15);color:#e15759}.agent-entity--equipment{background:rgba(178, 126, 197, 0.15);color:#b07cc5}.agent-entity--team{background:rgba(242, 142, 44, 0.15);color:#f28e2c}.agent-entity--topic{background:rgba(118, 183, 178, 0.15);color:#76b7b2}.agent-relation-list{font-size:0.85em}.agent-relation{padding:2px 0}.agent-relation-type{color:var(--text-accent);font-style:italic}.agent-source-list{display:flex;flex-direction:column;gap:6px}.agent-source{padding:6px 8px;border-left:3px solid var(--interactive-accent);background:var(--background-primary);border-radius:0 4px 4px 0}.agent-source-link{margin-bottom:2px}.agent-link{color:var(--link-color);cursor:pointer;text-decoration:underline;font-weight:500}.agent-link:hover{color:var(--link-color-hover)}.agent-source-excerpt{font-size:0.82em;color:var(--text-muted);font-style:italic}.agent-gap-list{display:flex;flex-direction:column;gap:4px}.agent-gap{display:flex;gap:6px;padding:4px 0;font-size:0.85em}.agent-gap-icon{flex-shrink:0;color:var(--text-warning)}.agent-gap-text{color:var(--text-muted)}.agent-chat-input-area{padding:8px 12px;border-top:1px solid var(--background-modifier-border);display:flex;gap:8px;flex-shrink:0}.agent-chat-input{flex:1;resize:none;border-radius:6px;padding:8px;font-size:0.9em;background:var(--background-primary);color:var(--text-normal);border:1px solid var(--background-modifier-border);font-family:inherit}.agent-chat-input:focus{outline:none;border-color:var(--interactive-accent)}.agent-chat-send-button{align-self:flex-end;padding:8px 16px;border-radius:6px;border:none;background:var(--interactive-accent);color:var(--text-on-accent);cursor:pointer;font-weight:600;font-size:0.9em}.agent-chat-send-button:hover{opacity:0.85}.agent-open-graph-btn{display:block;margin-top:10px;padding:6px 14px;border-radius:6px;border:1px solid var(--background-modifier-border);background:var(--background-primary);color:var(--text-accent);cursor:pointer;font-size:0.82em;font-weight:500}.agent-open-graph-btn:hover{background:var(--background-modifier-hover)}.agent-graph-overlay{flex:1;display:flex;flex-direction:column;min-height:0;border-left:1px solid var(--background-modifier-border)}.agent-graph-header{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:1px solid var(--background-modifier-border);flex-shrink:0}.agent-graph-title{font-size:0.85em;font-weight:600}.agent-close-graph-btn{background:none;border:none;color:var(--text-muted);cursor:pointer;width:28px;height:28px;padding:0;border-radius:4px;display:flex;align-items:center;justify-content:center}.agent-close-graph-btn:hover{color:var(--text-normal);background:var(--background-modifier-hover)}.agent-graph-pane-body{flex:1;min-height:0;overflow:hidden}.agent-loading-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--text-muted);margin-right:3px;animation:svelte-1ui6c79-agent-dot-pulse 1.4s ease-in-out infinite both}.agent-loading-dot:nth-child(1){animation-delay:0s}.agent-loading-dot:nth-child(2){animation-delay:0.2s}.agent-loading-dot:nth-child(3){animation-delay:0.4s}@keyframes svelte-1ui6c79-agent-dot-pulse{0%,80%,100%{opacity:0.2;transform:scale(0.8)}40%{opacity:1;transform:scale(1.1)}}.agent-cursor{animation:svelte-1ui6c79-agent-blink 1s step-end infinite;color:var(--interactive-accent);font-weight:700}@keyframes svelte-1ui6c79-agent-blink{50%{opacity:0}}");
-  }
-  function get_each_context10(ctx, list, i) {
-    const child_ctx = ctx.slice();
-    child_ctx[38] = list[i];
-    return child_ctx;
-  }
-  function get_each_context_14(ctx, list, i) {
-    const child_ctx = ctx.slice();
-    child_ctx[41] = list[i];
-    return child_ctx;
-  }
-  function create_if_block_84(ctx) {
-    let div2;
-    let div0;
-    let span;
-    let t1;
-    let button;
-    let t2;
-    let div1;
-    let each_blocks = [];
-    let each_1_lookup = /* @__PURE__ */ new Map();
-    let mounted;
-    let dispose;
-    let each_value_1 = ensure_array_like(
-      /*sessions*/
-      ctx[7]
-    );
-    const get_key = (ctx2) => (
-      /*s*/
-      ctx2[41].id
-    );
-    for (let i = 0; i < each_value_1.length; i += 1) {
-      let child_ctx = get_each_context_14(ctx, each_value_1, i);
-      let key = get_key(child_ctx);
-      each_1_lookup.set(key, each_blocks[i] = create_each_block_14(key, child_ctx));
-    }
-    return {
-      c() {
-        div2 = element("div");
-        div0 = element("div");
-        span = element("span");
-        span.textContent = "Sessions";
-        t1 = space();
-        button = element("button");
-        button.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>`;
-        t2 = space();
-        div1 = element("div");
-        for (let i = 0; i < each_blocks.length; i += 1) {
-          each_blocks[i].c();
-        }
-        attr(button, "class", "agent-chat-new-btn");
-        attr(button, "title", "New Chat");
-        attr(div0, "class", "agent-sessions-panel-header");
-        attr(div1, "class", "agent-sessions-list");
-        attr(div2, "class", "agent-sessions-panel");
-      },
-      m(target, anchor) {
-        insert(target, div2, anchor);
-        append(div2, div0);
-        append(div0, span);
-        append(div0, t1);
-        append(div0, button);
-        append(div2, t2);
-        append(div2, div1);
-        for (let i = 0; i < each_blocks.length; i += 1) {
-          if (each_blocks[i]) {
-            each_blocks[i].m(div1, null);
-          }
-        }
-        if (!mounted) {
-          dispose = listen(
-            button,
-            "click",
-            /*newChat*/
-            ctx[12]
-          );
-          mounted = true;
-        }
-      },
-      p(ctx2, dirty) {
-        if (dirty[0] & /*sessions, currentSessionId, loadSession, deleteSession*/
-        3208) {
-          each_value_1 = ensure_array_like(
-            /*sessions*/
-            ctx2[7]
-          );
-          each_blocks = update_keyed_each(each_blocks, dirty, get_key, 1, ctx2, each_value_1, each_1_lookup, div1, destroy_block, create_each_block_14, null, get_each_context_14);
-        }
-      },
-      d(detaching) {
-        if (detaching) {
-          detach(div2);
-        }
-        for (let i = 0; i < each_blocks.length; i += 1) {
-          each_blocks[i].d();
-        }
-        mounted = false;
-        dispose();
-      }
-    };
-  }
-  function create_each_block_14(key_1, ctx) {
-    let div2;
-    let div0;
-    let t0_value = (
-      /*s*/
-      (ctx[41].title || "Untitled") + ""
-    );
-    let t0;
-    let t1;
-    let div1;
-    let span0;
-    let t2_value = (
-      /*s*/
-      ctx[41].messageCount + ""
-    );
-    let t2;
-    let t3;
-    let t4;
-    let span1;
-    let t5_value = formatDate(
-      /*s*/
-      ctx[41].updatedAt
-    ) + "";
-    let t5;
-    let t6;
-    let button;
-    let t7;
-    let mounted;
-    let dispose;
-    function click_handler(...args) {
-      return (
-        /*click_handler*/
-        ctx[21](
-          /*s*/
-          ctx[41],
-          ...args
-        )
-      );
-    }
-    function click_handler_1() {
-      return (
-        /*click_handler_1*/
-        ctx[22](
-          /*s*/
-          ctx[41]
-        )
-      );
-    }
-    function keydown_handler(...args) {
-      return (
-        /*keydown_handler*/
-        ctx[23](
-          /*s*/
-          ctx[41],
-          ...args
-        )
-      );
-    }
-    return {
-      key: key_1,
-      first: null,
-      c() {
-        div2 = element("div");
-        div0 = element("div");
-        t0 = text(t0_value);
-        t1 = space();
-        div1 = element("div");
-        span0 = element("span");
-        t2 = text(t2_value);
-        t3 = text(" msg");
-        t4 = space();
-        span1 = element("span");
-        t5 = text(t5_value);
-        t6 = space();
-        button = element("button");
-        button.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`;
-        t7 = space();
-        attr(div0, "class", "agent-session-item-title");
-        attr(div1, "class", "agent-session-item-meta");
-        attr(button, "class", "agent-session-delete");
-        attr(button, "title", "Delete");
-        attr(div2, "class", "agent-session-item");
-        attr(div2, "role", "button");
-        attr(div2, "tabindex", "0");
-        toggle_class(
-          div2,
-          "active",
-          /*s*/
-          ctx[41].id === /*currentSessionId*/
-          ctx[3]
-        );
-        this.first = div2;
-      },
-      m(target, anchor) {
-        insert(target, div2, anchor);
-        append(div2, div0);
-        append(div0, t0);
-        append(div2, t1);
-        append(div2, div1);
-        append(div1, span0);
-        append(span0, t2);
-        append(span0, t3);
-        append(div1, t4);
-        append(div1, span1);
-        append(span1, t5);
-        append(div2, t6);
-        append(div2, button);
-        append(div2, t7);
-        if (!mounted) {
-          dispose = [
-            listen(button, "click", click_handler),
-            listen(div2, "click", click_handler_1),
-            listen(div2, "keydown", keydown_handler)
-          ];
-          mounted = true;
-        }
-      },
-      p(new_ctx, dirty) {
-        ctx = new_ctx;
-        if (dirty[0] & /*sessions*/
-        128 && t0_value !== (t0_value = /*s*/
-        (ctx[41].title || "Untitled") + ""))
-          set_data(t0, t0_value);
-        if (dirty[0] & /*sessions*/
-        128 && t2_value !== (t2_value = /*s*/
-        ctx[41].messageCount + ""))
-          set_data(t2, t2_value);
-        if (dirty[0] & /*sessions*/
-        128 && t5_value !== (t5_value = formatDate(
-          /*s*/
-          ctx[41].updatedAt
-        ) + ""))
-          set_data(t5, t5_value);
-        if (dirty[0] & /*sessions, currentSessionId*/
-        136) {
-          toggle_class(
-            div2,
-            "active",
-            /*s*/
-            ctx[41].id === /*currentSessionId*/
-            ctx[3]
-          );
-        }
-      },
-      d(detaching) {
-        if (detaching) {
-          detach(div2);
-        }
-        mounted = false;
-        run_all(dispose);
-      }
-    };
-  }
-  function create_if_block_74(ctx) {
-    let div;
-    return {
-      c() {
-        div = element("div");
-        div.textContent = `${PLACEHOLDER}`;
-        attr(div, "class", "agent-chat-placeholder");
-      },
-      m(target, anchor) {
-        insert(target, div, anchor);
-      },
-      p: noop,
-      d(detaching) {
-        if (detaching) {
-          detach(div);
-        }
-      }
-    };
-  }
-  function create_if_block_64(ctx) {
-    let div1;
-    let div0;
-    let t_value = (
-      /*msg*/
-      ctx[38].content + ""
-    );
-    let t;
-    return {
-      c() {
-        div1 = element("div");
-        div0 = element("div");
-        t = text(t_value);
-        attr(div0, "class", "agent-chat-message-body");
-        attr(div1, "class", "agent-chat-message agent-chat-message--error");
-      },
-      m(target, anchor) {
-        insert(target, div1, anchor);
-        append(div1, div0);
-        append(div0, t);
-      },
-      p(ctx2, dirty) {
-        if (dirty[0] & /*messages*/
-        2 && t_value !== (t_value = /*msg*/
-        ctx2[38].content + ""))
-          set_data(t, t_value);
-      },
-      d(detaching) {
-        if (detaching) {
-          detach(div1);
-        }
-      }
-    };
-  }
-  function create_if_block_46(ctx) {
-    let div2;
-    let div0;
-    let t1;
-    let div1;
-    let raw_value = (
-      /*msg*/
-      ctx[38].html + ""
-    );
-    let t2;
-    let if_block = (
-      /*msg*/
-      ctx[38].subgraph && create_if_block_54(ctx)
-    );
-    return {
-      c() {
-        div2 = element("div");
-        div0 = element("div");
-        div0.innerHTML = `<span class="agent-chat-message-role">Agent</span>`;
-        t1 = space();
-        div1 = element("div");
-        t2 = space();
-        if (if_block)
-          if_block.c();
-        attr(div0, "class", "agent-chat-message-header");
-        attr(div1, "class", "agent-chat-message-body");
-        attr(div2, "class", "agent-chat-message agent-chat-message--agent");
-      },
-      m(target, anchor) {
-        insert(target, div2, anchor);
-        append(div2, div0);
-        append(div2, t1);
-        append(div2, div1);
-        div1.innerHTML = raw_value;
-        append(div2, t2);
-        if (if_block)
-          if_block.m(div2, null);
-      },
-      p(ctx2, dirty) {
-        if (dirty[0] & /*messages*/
-        2 && raw_value !== (raw_value = /*msg*/
-        ctx2[38].html + ""))
-          div1.innerHTML = raw_value;
-        ;
-        if (
-          /*msg*/
-          ctx2[38].subgraph
-        ) {
-          if (if_block) {
-            if_block.p(ctx2, dirty);
-          } else {
-            if_block = create_if_block_54(ctx2);
-            if_block.c();
-            if_block.m(div2, null);
-          }
-        } else if (if_block) {
-          if_block.d(1);
-          if_block = null;
-        }
-      },
-      d(detaching) {
-        if (detaching) {
-          detach(div2);
-        }
-        if (if_block)
-          if_block.d();
-      }
-    };
-  }
-  function create_if_block_38(ctx) {
-    let div1;
-    let div0;
-    let t_value = (
-      /*msg*/
-      ctx[38].content + ""
-    );
-    let t;
-    return {
-      c() {
-        div1 = element("div");
-        div0 = element("div");
-        t = text(t_value);
-        attr(div0, "class", "agent-chat-message-body");
-        attr(div1, "class", "agent-chat-message agent-chat-message--user");
-      },
-      m(target, anchor) {
-        insert(target, div1, anchor);
-        append(div1, div0);
-        append(div0, t);
-      },
-      p(ctx2, dirty) {
-        if (dirty[0] & /*messages*/
-        2 && t_value !== (t_value = /*msg*/
-        ctx2[38].content + ""))
-          set_data(t, t_value);
-      },
-      d(detaching) {
-        if (detaching) {
-          detach(div1);
-        }
-      }
-    };
-  }
-  function create_if_block_54(ctx) {
-    let button;
-    let mounted;
-    let dispose;
-    function click_handler_2() {
-      return (
-        /*click_handler_2*/
-        ctx[24](
-          /*msg*/
-          ctx[38]
-        )
-      );
-    }
-    return {
-      c() {
-        button = element("button");
-        button.textContent = "Open Graph";
-        attr(button, "class", "agent-open-graph-btn");
-      },
-      m(target, anchor) {
-        insert(target, button, anchor);
-        if (!mounted) {
-          dispose = listen(button, "click", click_handler_2);
-          mounted = true;
-        }
-      },
-      p(new_ctx, dirty) {
-        ctx = new_ctx;
-      },
-      d(detaching) {
-        if (detaching) {
-          detach(button);
-        }
-        mounted = false;
-        dispose();
-      }
-    };
-  }
-  function create_each_block10(key_1, ctx) {
-    let first;
-    let if_block_anchor;
-    function select_block_type(ctx2, dirty) {
-      if (
-        /*msg*/
-        ctx2[38].role === "user"
-      )
-        return create_if_block_38;
-      if (
-        /*msg*/
-        ctx2[38].role === "agent"
-      )
-        return create_if_block_46;
-      if (
-        /*msg*/
-        ctx2[38].role === "error"
-      )
-        return create_if_block_64;
-    }
-    let current_block_type = select_block_type(ctx, [-1, -1]);
-    let if_block = current_block_type && current_block_type(ctx);
-    return {
-      key: key_1,
-      first: null,
-      c() {
-        first = empty();
-        if (if_block)
-          if_block.c();
-        if_block_anchor = empty();
-        this.first = first;
-      },
-      m(target, anchor) {
-        insert(target, first, anchor);
-        if (if_block)
-          if_block.m(target, anchor);
-        insert(target, if_block_anchor, anchor);
-      },
-      p(new_ctx, dirty) {
-        ctx = new_ctx;
-        if (current_block_type === (current_block_type = select_block_type(ctx, dirty)) && if_block) {
-          if_block.p(ctx, dirty);
-        } else {
-          if (if_block)
-            if_block.d(1);
-          if_block = current_block_type && current_block_type(ctx);
-          if (if_block) {
-            if_block.c();
-            if_block.m(if_block_anchor.parentNode, if_block_anchor);
-          }
-        }
-      },
-      d(detaching) {
-        if (detaching) {
-          detach(first);
-          detach(if_block_anchor);
-        }
-        if (if_block) {
-          if_block.d(detaching);
-        }
-      }
-    };
-  }
-  function create_if_block_113(ctx) {
-    let if_block_anchor;
-    function select_block_type_1(ctx2, dirty) {
-      if (
-        /*loadingHtml*/
-        ctx2[0]
-      )
-        return create_if_block_29;
-      return create_else_block8;
-    }
-    let current_block_type = select_block_type_1(ctx, [-1, -1]);
-    let if_block = current_block_type(ctx);
-    return {
-      c() {
-        if_block.c();
-        if_block_anchor = empty();
-      },
-      m(target, anchor) {
-        if_block.m(target, anchor);
-        insert(target, if_block_anchor, anchor);
-      },
-      p(ctx2, dirty) {
-        if (current_block_type === (current_block_type = select_block_type_1(ctx2, dirty)) && if_block) {
-          if_block.p(ctx2, dirty);
-        } else {
-          if_block.d(1);
-          if_block = current_block_type(ctx2);
-          if (if_block) {
-            if_block.c();
-            if_block.m(if_block_anchor.parentNode, if_block_anchor);
-          }
-        }
-      },
-      d(detaching) {
-        if (detaching) {
-          detach(if_block_anchor);
-        }
-        if_block.d(detaching);
-      }
-    };
-  }
-  function create_else_block8(ctx) {
-    let div;
-    return {
-      c() {
-        div = element("div");
-        div.textContent = "Agent is thinking...";
-        attr(div, "class", "agent-chat-loading");
-      },
-      m(target, anchor) {
-        insert(target, div, anchor);
-      },
-      p: noop,
-      d(detaching) {
-        if (detaching) {
-          detach(div);
-        }
-      }
-    };
-  }
-  function create_if_block_29(ctx) {
-    let html_tag;
-    let html_anchor;
-    return {
-      c() {
-        html_tag = new HtmlTag(false);
-        html_anchor = empty();
-        html_tag.a = html_anchor;
-      },
-      m(target, anchor) {
-        html_tag.m(
-          /*loadingHtml*/
-          ctx[0],
-          target,
-          anchor
-        );
-        insert(target, html_anchor, anchor);
-      },
-      p(ctx2, dirty) {
-        if (dirty[0] & /*loadingHtml*/
-        1)
-          html_tag.p(
-            /*loadingHtml*/
-            ctx2[0]
-          );
-      },
-      d(detaching) {
-        if (detaching) {
-          detach(html_anchor);
-          html_tag.d();
-        }
-      }
-    };
-  }
-  function create_if_block17(ctx) {
-    let div2;
-    let div0;
-    let span;
-    let t1;
-    let button;
-    let t2;
-    let div1;
-    let graphpane;
-    let div2_transition;
-    let current;
-    let mounted;
-    let dispose;
-    graphpane = new GraphPane_default({
-      props: {
-        nodes: (
-          /*activeGraph*/
-          ctx[9].nodes
-        ),
-        edges: (
-          /*activeGraph*/
-          ctx[9].edges
-        )
-      }
-    });
-    return {
-      c() {
-        div2 = element("div");
-        div0 = element("div");
-        span = element("span");
-        span.textContent = "Knowledge Graph";
-        t1 = space();
-        button = element("button");
-        button.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
-        t2 = space();
-        div1 = element("div");
-        create_component(graphpane.$$.fragment);
-        attr(span, "class", "agent-graph-title");
-        attr(button, "class", "agent-close-graph-btn");
-        attr(button, "title", "Close graph");
-        attr(div0, "class", "agent-graph-header");
-        attr(div1, "class", "agent-graph-pane-body");
-        attr(div2, "class", "agent-graph-overlay");
-      },
-      m(target, anchor) {
-        insert(target, div2, anchor);
-        append(div2, div0);
-        append(div0, span);
-        append(div0, t1);
-        append(div0, button);
-        append(div2, t2);
-        append(div2, div1);
-        mount_component(graphpane, div1, null);
-        current = true;
-        if (!mounted) {
-          dispose = listen(
-            button,
-            "click",
-            /*closeGraph*/
-            ctx[18]
-          );
-          mounted = true;
-        }
-      },
-      p(ctx2, dirty) {
-        const graphpane_changes = {};
-        if (dirty[0] & /*activeGraph*/
-        512)
-          graphpane_changes.nodes = /*activeGraph*/
-          ctx2[9].nodes;
-        if (dirty[0] & /*activeGraph*/
-        512)
-          graphpane_changes.edges = /*activeGraph*/
-          ctx2[9].edges;
-        graphpane.$set(graphpane_changes);
-      },
-      i(local) {
-        if (current)
-          return;
-        transition_in(graphpane.$$.fragment, local);
-        if (local) {
-          add_render_callback(() => {
-            if (!current)
-              return;
-            if (!div2_transition)
-              div2_transition = create_bidirectional_transition(div2, fade, {}, true);
-            div2_transition.run(1);
-          });
-        }
-        current = true;
-      },
-      o(local) {
-        transition_out(graphpane.$$.fragment, local);
-        if (local) {
-          if (!div2_transition)
-            div2_transition = create_bidirectional_transition(div2, fade, {}, false);
-          div2_transition.run(0);
-        }
-        current = false;
-      },
-      d(detaching) {
-        if (detaching) {
-          detach(div2);
-        }
-        destroy_component(graphpane);
-        if (detaching && div2_transition)
-          div2_transition.end();
-        mounted = false;
-        dispose();
-      }
-    };
-  }
-  function create_fragment48(ctx) {
-    let div5;
-    let div1;
-    let div0;
-    let button0;
-    let t0;
-    let button1;
-    let t1;
-    let h3;
-    let t2;
-    let t3;
-    let div3;
-    let t4;
-    let div2;
-    let t5;
-    let each_blocks = [];
-    let each_1_lookup = /* @__PURE__ */ new Map();
-    let t6;
-    let t7;
-    let t8;
-    let div4;
-    let textarea;
-    let t9;
-    let button2;
-    let t10;
-    let current;
-    let mounted;
-    let dispose;
-    let if_block0 = (
-      /*showSessions*/
-      ctx[8] && create_if_block_84(ctx)
-    );
-    let if_block1 = (
-      /*messages*/
-      ctx[1].length === 0 && create_if_block_74(ctx)
-    );
-    let each_value = ensure_array_like(
-      /*messages*/
-      ctx[1]
-    );
-    const get_key = (ctx2) => (
-      /*msg*/
-      ctx2[38] === /*messages*/
-      ctx2[1][
-        /*messages*/
-        ctx2[1].length - 1
-      ] ? null : Math.random()
-    );
-    for (let i = 0; i < each_value.length; i += 1) {
-      let child_ctx = get_each_context10(ctx, each_value, i);
-      let key = get_key(child_ctx);
-      each_1_lookup.set(key, each_blocks[i] = create_each_block10(key, child_ctx));
-    }
-    let if_block2 = (
-      /*loading*/
-      ctx[5] && create_if_block_113(ctx)
-    );
-    let if_block3 = (
-      /*activeGraph*/
-      ctx[9] && create_if_block17(ctx)
-    );
-    return {
-      c() {
-        div5 = element("div");
-        div1 = element("div");
-        div0 = element("div");
-        button0 = element("button");
-        button0.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"></line><line x1="4" y1="12" x2="20" y2="12"></line><line x1="4" y1="18" x2="20" y2="18"></line></svg>`;
-        t0 = space();
-        button1 = element("button");
-        button1.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>`;
-        t1 = space();
-        h3 = element("h3");
-        t2 = text(
-          /*sessionTitle*/
-          ctx[6]
-        );
-        t3 = space();
-        div3 = element("div");
-        if (if_block0)
-          if_block0.c();
-        t4 = space();
-        div2 = element("div");
-        if (if_block1)
-          if_block1.c();
-        t5 = space();
-        for (let i = 0; i < each_blocks.length; i += 1) {
-          each_blocks[i].c();
-        }
-        t6 = space();
-        if (if_block2)
-          if_block2.c();
-        t7 = space();
-        if (if_block3)
-          if_block3.c();
-        t8 = space();
-        div4 = element("div");
-        textarea = element("textarea");
-        t9 = space();
-        button2 = element("button");
-        t10 = text("Send");
-        attr(button0, "class", "agent-chat-sessions-btn");
-        attr(button0, "title", "Sessions");
-        attr(button1, "class", "agent-chat-new-btn");
-        attr(button1, "title", "New Chat");
-        attr(div0, "class", "agent-chat-header-left");
-        attr(div1, "class", "agent-chat-header");
-        attr(div2, "class", "agent-chat-messages");
-        attr(div2, "role", "log");
-        attr(div2, "tabindex", "0");
-        attr(div3, "class", "agent-chat-body");
-        attr(textarea, "class", "agent-chat-input");
-        attr(textarea, "rows", "3");
-        attr(textarea, "placeholder", PLACEHOLDER);
-        attr(button2, "class", "agent-chat-send-button");
-        button2.disabled = /*loading*/
-        ctx[5];
-        attr(div4, "class", "agent-chat-input-area");
-        attr(div5, "class", "agent-chat-container");
-      },
-      m(target, anchor) {
-        insert(target, div5, anchor);
-        append(div5, div1);
-        append(div1, div0);
-        append(div0, button0);
-        append(div0, t0);
-        append(div0, button1);
-        append(div0, t1);
-        append(div0, h3);
-        append(h3, t2);
-        append(div5, t3);
-        append(div5, div3);
-        if (if_block0)
-          if_block0.m(div3, null);
-        append(div3, t4);
-        append(div3, div2);
-        if (if_block1)
-          if_block1.m(div2, null);
-        append(div2, t5);
-        for (let i = 0; i < each_blocks.length; i += 1) {
-          if (each_blocks[i]) {
-            each_blocks[i].m(div2, null);
-          }
-        }
-        append(div2, t6);
-        if (if_block2)
-          if_block2.m(div2, null);
-        ctx[25](div2);
-        append(div3, t7);
-        if (if_block3)
-          if_block3.m(div3, null);
-        append(div5, t8);
-        append(div5, div4);
-        append(div4, textarea);
-        set_input_value(
-          textarea,
-          /*input*/
-          ctx[4]
-        );
-        append(div4, t9);
-        append(div4, button2);
-        append(button2, t10);
-        current = true;
-        if (!mounted) {
-          dispose = [
-            listen(
-              button0,
-              "click",
-              /*toggleSessions*/
-              ctx[13]
-            ),
-            listen(
-              button1,
-              "click",
-              /*newChat*/
-              ctx[12]
-            ),
-            listen(
-              div2,
-              "click",
-              /*handleLinkClick*/
-              ctx[14]
-            ),
-            listen(div2, "keydown", keydown_handler_1),
-            listen(
-              textarea,
-              "input",
-              /*textarea_input_handler*/
-              ctx[26]
-            ),
-            listen(
-              textarea,
-              "keydown",
-              /*onKeydown*/
-              ctx[16]
-            ),
-            listen(
-              button2,
-              "click",
-              /*sendMessage*/
-              ctx[15]
-            )
-          ];
-          mounted = true;
-        }
-      },
-      p(ctx2, dirty) {
-        if (!current || dirty[0] & /*sessionTitle*/
-        64)
-          set_data(
-            t2,
-            /*sessionTitle*/
-            ctx2[6]
-          );
-        if (
-          /*showSessions*/
-          ctx2[8]
-        ) {
-          if (if_block0) {
-            if_block0.p(ctx2, dirty);
-          } else {
-            if_block0 = create_if_block_84(ctx2);
-            if_block0.c();
-            if_block0.m(div3, t4);
-          }
-        } else if (if_block0) {
-          if_block0.d(1);
-          if_block0 = null;
-        }
-        if (
-          /*messages*/
-          ctx2[1].length === 0
-        ) {
-          if (if_block1) {
-            if_block1.p(ctx2, dirty);
-          } else {
-            if_block1 = create_if_block_74(ctx2);
-            if_block1.c();
-            if_block1.m(div2, t5);
-          }
-        } else if (if_block1) {
-          if_block1.d(1);
-          if_block1 = null;
-        }
-        if (dirty[0] & /*messages, openGraph*/
-        131074) {
-          each_value = ensure_array_like(
-            /*messages*/
-            ctx2[1]
-          );
-          each_blocks = update_keyed_each(each_blocks, dirty, get_key, 1, ctx2, each_value, each_1_lookup, div2, destroy_block, create_each_block10, t6, get_each_context10);
-        }
-        if (
-          /*loading*/
-          ctx2[5]
-        ) {
-          if (if_block2) {
-            if_block2.p(ctx2, dirty);
-          } else {
-            if_block2 = create_if_block_113(ctx2);
-            if_block2.c();
-            if_block2.m(div2, null);
-          }
-        } else if (if_block2) {
-          if_block2.d(1);
-          if_block2 = null;
-        }
-        if (
-          /*activeGraph*/
-          ctx2[9]
-        ) {
-          if (if_block3) {
-            if_block3.p(ctx2, dirty);
-            if (dirty[0] & /*activeGraph*/
-            512) {
-              transition_in(if_block3, 1);
-            }
-          } else {
-            if_block3 = create_if_block17(ctx2);
-            if_block3.c();
-            transition_in(if_block3, 1);
-            if_block3.m(div3, null);
-          }
-        } else if (if_block3) {
-          group_outros();
-          transition_out(if_block3, 1, 1, () => {
-            if_block3 = null;
-          });
-          check_outros();
-        }
-        if (dirty[0] & /*input*/
-        16) {
-          set_input_value(
-            textarea,
-            /*input*/
-            ctx2[4]
-          );
-        }
-        if (!current || dirty[0] & /*loading*/
-        32) {
-          button2.disabled = /*loading*/
-          ctx2[5];
-        }
-      },
-      i(local) {
-        if (current)
-          return;
-        transition_in(if_block3);
-        current = true;
-      },
-      o(local) {
-        transition_out(if_block3);
-        current = false;
-      },
-      d(detaching) {
-        if (detaching) {
-          detach(div5);
-        }
-        if (if_block0)
-          if_block0.d();
-        if (if_block1)
-          if_block1.d();
-        for (let i = 0; i < each_blocks.length; i += 1) {
-          each_blocks[i].d();
-        }
-        if (if_block2)
-          if_block2.d();
-        ctx[25](null);
-        if (if_block3)
-          if_block3.d();
-        mounted = false;
-        run_all(dispose);
-      }
-    };
-  }
-  var API = "/api/ext/agent";
-  var PLACEHOLDER = "Ask a question about materials, experiments, properties...";
-  function formatDate(iso) {
-    if (!iso)
-      return "";
-    const d = new Date(iso);
-    const now3 = /* @__PURE__ */ new Date();
-    const diff = now3 - d;
-    if (diff < 36e5)
-      return `${Math.floor(diff / 6e4)}m ago`;
-    if (diff < 864e5)
-      return `${Math.floor(diff / 36e5)}h ago`;
-    return d.toLocaleDateString();
-  }
-  var keydown_handler_1 = () => {
-  };
-  function instance48($$self, $$props, $$invalidate) {
-    let { linkHandler = null } = $$props;
-    let { loadingHtml = null } = $$props;
-    let messages = [];
-    let input = "";
-    let loading = false;
-    let messagesEl;
-    let currentSessionId = null;
-    let sessionTitle = "New Chat";
-    let sessions = [];
-    let showSessions = false;
-    let sessionLoaded = false;
-    let saveTimer = null;
-    let activeGraph = null;
-    async function initSessions() {
-      try {
-        const res = await fetch(`${API}/sessions`);
-        if (!res.ok)
-          return;
-        $$invalidate(7, sessions = await res.json());
-        if (sessions.length > 0) {
-          await loadSession(sessions[0].id);
-        } else {
-          await createSession();
-        }
-      } catch {
-        await createSession();
-      }
-    }
-    async function createSession() {
-      try {
-        const res = await fetch(`${API}/sessions`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ title: "New Chat" })
-        });
-        if (!res.ok)
-          return;
-        const s = await res.json();
-        $$invalidate(3, currentSessionId = s.id);
-        $$invalidate(6, sessionTitle = s.title);
-        $$invalidate(1, messages = []);
-        $$invalidate(20, sessionLoaded = true);
-      } catch {
-      }
-    }
-    async function loadSession(id2) {
-      try {
-        const res = await fetch(`${API}/sessions/${id2}`);
-        if (!res.ok)
-          return;
-        const s = await res.json();
-        $$invalidate(3, currentSessionId = s.id);
-        $$invalidate(6, sessionTitle = s.title || "Untitled");
-        $$invalidate(1, messages = s.messages || []);
-        $$invalidate(20, sessionLoaded = true);
-        $$invalidate(8, showSessions = false);
-      } catch {
-      }
-    }
-    function scheduleSave() {
-      if (saveTimer)
-        clearTimeout(saveTimer);
-      saveTimer = setTimeout(saveSession, 500);
-    }
-    async function saveSession() {
-      if (!currentSessionId)
-        return;
-      try {
-        await fetch(`${API}/sessions/${currentSessionId}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messages, title: sessionTitle })
-        });
-      } catch {
-      }
-    }
-    async function deleteSession(id2, e) {
-      e.stopPropagation();
-      try {
-        await fetch(`${API}/sessions/${id2}`, { method: "DELETE" });
-        $$invalidate(7, sessions = sessions.filter((s) => s.id !== id2));
-        if (id2 === currentSessionId) {
-          if (sessions.length > 0) {
-            await loadSession(sessions[0].id);
-          } else {
-            await createSession();
-          }
-        }
-      } catch {
-      }
-    }
-    async function newChat() {
-      await createSession();
-      await fetchSessions();
-      $$invalidate(8, showSessions = false);
-    }
-    async function fetchSessions() {
-      try {
-        const res = await fetch(`${API}/sessions`);
-        if (res.ok)
-          $$invalidate(7, sessions = await res.json());
-      } catch {
-      }
-    }
-    function toggleSessions() {
-      $$invalidate(8, showSessions = !showSessions);
-      if (showSessions)
-        fetchSessions();
-    }
-    function openLink(path, quote) {
-      var _a, _b, _c, _d;
-      if (linkHandler) {
-        linkHandler(path, quote || null);
-      } else if ((_d = (_c = (_b = (_a = window.__ignis) == null ? void 0 : _a.obsidian) == null ? void 0 : _b.app) == null ? void 0 : _c.workspace) == null ? void 0 : _d.openLinkText) {
-        window.__ignis.obsidian.app.workspace.openLinkText(path, quote || "", false);
-      }
-    }
-    function handleLinkClick(e) {
-      const target = e.target;
-      if (target.classList.contains("agent-link")) {
-        const path = target.getAttribute("data-path");
-        if (path) {
-          e.preventDefault();
-          openLink(path, target.getAttribute("data-quote"));
-        }
-      }
-    }
-    function buildHistory(maxPairs = 5) {
-      const pairs = [];
-      for (let i = messages.length - 1; i >= 0 && pairs.length < maxPairs; i--) {
-        if (messages[i].role === "agent") {
-          const userMsg = i > 0 && messages[i - 1].role === "user" ? messages[i - 1] : null;
-          if (userMsg) {
-            pairs.unshift({
-              user: userMsg.content,
-              agent: messages[i].content
-            });
-            i--;
-          }
-        }
-      }
-      if (pairs.length === 0)
-        return "";
-      let ctx = "";
-      for (const p of pairs) {
-        ctx += `Q: ${p.user}
-A: ${p.agent}
-
-`;
-      }
-      return ctx.trimEnd();
-    }
-    async function sendMessage() {
-      const query = input.trim();
-      if (!query || loading)
-        return;
-      console.log("[agent] sendMessage:", query);
-      stopCharAnim();
-      if (messages.length === 0 && sessionTitle === "New Chat") {
-        $$invalidate(6, sessionTitle = query.slice(0, 40) + (query.length > 40 ? "..." : ""));
-      }
-      $$invalidate(1, messages = [...messages, { role: "user", content: query }]);
-      $$invalidate(4, input = "");
-      $$invalidate(5, loading = true);
-      const history2 = buildHistory();
-      const enhancedQuery = history2 ? `${history2}
-Current: ${query}` : query;
-      try {
-        const res = await fetch(`${API}/query`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ query: enhancedQuery })
-        });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.error || `Server error (${res.status})`);
-        }
-        const contentType = res.headers.get("content-type") || "";
-        console.log("[agent] response:", res.status, contentType);
-        if (contentType.includes("text/event-stream")) {
-          await handleSSE(res);
-        } else {
-          const data = await res.json();
-          const html = renderResponse(data);
-          $$invalidate(1, messages = [
-            ...messages,
-            {
-              role: "agent",
-              content: data.answer,
-              html
-            }
-          ]);
-        }
-      } catch (err) {
-        console.error("[agent] error:", err.message || err);
-        $$invalidate(1, messages = [
-          ...messages,
-          {
-            role: "error",
-            content: err.message || "Unknown error"
-          }
-        ]);
-      } finally {
-        $$invalidate(5, loading = false);
-      }
-    }
-    let charTimer = null;
-    function stopCharAnim() {
-      if (charTimer) {
-        clearTimeout(charTimer);
-        charTimer = null;
-      }
-    }
-    async function handleSSE(res) {
-      var _a, _b;
-      console.log("[agent] handleSSE started");
-      stopCharAnim();
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buf = "";
-      let eventType = "";
-      let fullAnswer = "";
-      let pendingChars = "";
-      let citations = [];
-      let subgraph = { nodes: [], edges: [] };
-      let hasError = false;
-      let streaming = true;
-      $$invalidate(1, messages = [...messages, { role: "agent", content: "", html: "" }]);
-      const agentIdx = messages.length - 1;
-      const before = messages.slice(0, agentIdx);
-      function tickDelay(n) {
-        if (n <= 0)
-          return 60;
-        if (n <= 3)
-          return 45;
-        if (n <= 8)
-          return 30;
-        if (n <= 20)
-          return 18;
-        if (n <= 60)
-          return 12;
-        return 8;
-      }
-      function tick2() {
-        if (pendingChars.length > 0) {
-          fullAnswer += pendingChars[0];
-          pendingChars = pendingChars.slice(1);
-          const html = `<div class="agent-block agent-block--answer">${parseMarkdown(fullAnswer)}<span class="agent-cursor">|</span></div>`;
-          $$invalidate(1, messages = [...before, { role: "agent", content: fullAnswer, html }]);
-          charTimer = setTimeout(tick2, tickDelay(pendingChars.length));
-        } else if (streaming) {
-          charTimer = setTimeout(tick2, tickDelay(0));
-        } else {
-          charTimer = null;
-        }
-      }
-      tick2();
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) {
-          streaming = false;
-          break;
-        }
-        buf += decoder.decode(value, { stream: true });
-        const lines = buf.split("\n");
-        buf = lines.pop() || "";
-        for (const line of lines) {
-          if (line.startsWith("event: ")) {
-            eventType = line.slice(7).trim();
-          } else if (line.startsWith("data: ")) {
-            try {
-              const payload = JSON.parse(line.slice(6));
-              switch (eventType) {
-                case "plan":
-                  console.log("[agent] plan event:", payload == null ? void 0 : payload.intent);
-                  break;
-                case "token": {
-                  const text2 = typeof payload === "string" ? payload : String(payload);
-                  pendingChars += text2;
-                  break;
-                }
-                case "citations":
-                  citations = Array.isArray(payload) ? payload : [];
-                  break;
-                case "subgraph":
-                  subgraph = payload && payload.nodes ? payload : { nodes: [], edges: [] };
-                  console.log("[agent] subgraph event:", (_a = subgraph.nodes) == null ? void 0 : _a.length, "nodes", (_b = subgraph.edges) == null ? void 0 : _b.length, "edges");
-                  break;
-                case "done":
-                  console.log("[agent] done event:", payload);
-                  break;
-                case "error":
-                  hasError = true;
-                  streaming = false;
-                  const errText = typeof payload === "string" ? payload : (payload == null ? void 0 : payload.message) || "Backend error";
-                  $$invalidate(1, messages = [...before, { role: "error", content: errText }]);
-                  break;
-              }
-            } catch {
-            }
-          }
-        }
-      }
-      while (charTimer || pendingChars.length > 0) {
-        await new Promise((r) => setTimeout(r, 30));
-      }
-      if (!hasError) {
-        const html = renderFromBackend(fullAnswer, subgraph, citations);
-        const showGraph = subgraph.nodes && subgraph.nodes.length > 0;
-        console.log("[agent] final render: nodes=" + subgraph.nodes.length, "edges=" + subgraph.edges.length, "showGraph=" + showGraph);
-        $$invalidate(1, messages = [
-          ...before,
-          {
-            role: "agent",
-            content: fullAnswer,
-            html,
-            subgraph: showGraph ? subgraph : null
-          }
-        ]);
-      }
-    }
-    function onKeydown(e) {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        sendMessage();
-      }
-    }
-    function openGraph(subgraph) {
-      $$invalidate(9, activeGraph = subgraph);
-    }
-    function closeGraph() {
-      $$invalidate(9, activeGraph = null);
-    }
-    initSessions();
-    console.log("[agent] ChatView mounted");
-    const click_handler = (s, e) => deleteSession(s.id, e);
-    const click_handler_1 = (s) => loadSession(s.id);
-    const keydown_handler = (s, e) => {
-      if (e.key === "Enter")
-        loadSession(s.id);
-    };
-    const click_handler_2 = (msg) => openGraph(msg.subgraph);
-    function div2_binding($$value) {
-      binding_callbacks[$$value ? "unshift" : "push"](() => {
-        messagesEl = $$value;
-        $$invalidate(2, messagesEl), $$invalidate(1, messages);
-      });
-    }
-    function textarea_input_handler() {
-      input = this.value;
-      $$invalidate(4, input);
-    }
-    $$self.$$set = ($$props2) => {
-      if ("linkHandler" in $$props2)
-        $$invalidate(19, linkHandler = $$props2.linkHandler);
-      if ("loadingHtml" in $$props2)
-        $$invalidate(0, loadingHtml = $$props2.loadingHtml);
-    };
-    $$self.$$.update = () => {
-      if ($$self.$$.dirty[0] & /*messagesEl, messages*/
-      6) {
-        $:
-          if (messagesEl && messages.length > 0) {
-            $$invalidate(2, messagesEl.scrollTop = messagesEl.scrollHeight, messagesEl);
-          }
-      }
-      if ($$self.$$.dirty[0] & /*sessionLoaded, currentSessionId, messages*/
-      1048586) {
-        $:
-          if (sessionLoaded && currentSessionId && messages) {
-            scheduleSave();
-          }
-      }
-    };
-    return [
-      loadingHtml,
-      messages,
-      messagesEl,
-      currentSessionId,
-      input,
-      loading,
-      sessionTitle,
-      sessions,
-      showSessions,
-      activeGraph,
-      loadSession,
-      deleteSession,
-      newChat,
-      toggleSessions,
-      handleLinkClick,
-      sendMessage,
-      onKeydown,
-      openGraph,
-      closeGraph,
-      linkHandler,
-      sessionLoaded,
-      click_handler,
-      click_handler_1,
-      keydown_handler,
-      click_handler_2,
-      div2_binding,
-      textarea_input_handler
-    ];
-  }
-  var ChatView = class extends SvelteComponent {
-    constructor(options) {
-      super();
-      init(this, options, instance48, create_fragment48, safe_not_equal, { linkHandler: 19, loadingHtml: 0 }, add_css22, [-1, -1]);
-    }
-  };
-  var ChatView_default = ChatView;
 
   // packages/ui/src/views/agent/loading-presets.js
   var LOADER = `<span class="agent-loading-dot"></span><span class="agent-loading-dot"></span><span class="agent-loading-dot"></span>`;
