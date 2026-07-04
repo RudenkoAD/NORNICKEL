@@ -34,20 +34,19 @@ services:
       retries: 15
       start_period: 40s
 
-  # --- backend (§11): FastAPI + uvicorn workers=1. Раскомментировать после появления
-  #     backend/Dockerfile и app/main.py. Схему инициализирует scripts/init_db.py. ---
-  # backend:
-  #   build: ./backend
-  #   container_name: nornickel-backend
-  #   restart: unless-stopped
-  #   depends_on:
-  #     neo4j:
-  #       condition: service_healthy
-  #   env_file: .env
-  #   environment:
-  #     NEO4J_URI: "bolt://neo4j:7687"
-  #   ports:
-  #     - "8000:8000"                      # Swagger /docs для жюри
+  # --- backend (§11): FastAPI + uvicorn workers=1 (инвариант №8). ---
+  backend:
+    build: ./backend
+    container_name: nornickel-backend
+    restart: unless-stopped
+    depends_on:
+      neo4j:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      NEO4J_URI: "bolt://neo4j:7687"       # внутри docker-сети — имя сервиса
+    ports:
+      - "8000:8000"                        # Swagger /docs + API для жюри и фронта
 
   # --- frontend (§8, §11): Streamlit — тонкий клиент над REST API. ---
   # frontend:

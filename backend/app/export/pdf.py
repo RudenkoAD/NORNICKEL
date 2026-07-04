@@ -24,7 +24,9 @@ PANDOC_TIMEOUT_S = 30
 # Движок PDF pandoc (§9). xelatex умеет кириллицу при наличии шрифта — задаётся в
 # Dockerfile; здесь оставляем дефолтный движок pandoc, чтобы не падать, если xelatex
 # не установлен, но шрифт с кириллицей есть.
-PANDOC_PDF_ARGS = ("--pdf-engine=xelatex",)
+PANDOC_PDF_ARGS = ("--pdf-engine=xelatex", "-V", "mainfont=DejaVu Sans")
+# mainfont обязателен (04.07): дефолтный шрифт xelatex (Latin Modern) не содержит
+# кириллицы — без него PDF выходит «квадратами». DejaVu ставится в Dockerfile.
 
 
 class PandocUnavailable(Exception):

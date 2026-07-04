@@ -329,3 +329,58 @@ units:
   "kJ":       {category: energy, multiplier: 1000.0, offset: 0.0}
   "МДж":      {category: energy, multiplier: 1000000.0, offset: 0.0}
   "MJ":       {category: energy, multiplier: 1000000.0, offset: 0.0}
+
+  # --- Пополнение 04.07 (консолидация по графу, партия №1: журналы «Горная
+  # промышленность»/«Цветные металлы» + конференции; домены: угледобыча, ТЭП,
+  # геомеханика/сейсмика). Единицы флагались как unknown_units (§4.3, уровень 2).
+  # ДОБАВЛЯЮТСЯ ТОЛЬКО ТОЧНЫЕ, физически однозначные конвертации (инвариант №1).
+  # Сомнительное (год/месяц как время, валюта, карат, штучные «единицы») — в отчёт
+  # человеку, НЕ добавлено. ---
+  #
+  # Масса → г. Крупные тоннажи добычи/переработки/отходов («668 млн т», «478,8 тыс. т»,
+  # «3,2 млрд т»). 1 т = 1e6 г — точно (базовая «т» уже в словаре как 1e6 г).
+  "тыс. т":   {category: mass, multiplier: 1000000000.0, offset: 0.0}    # 1e3 т = 1e9 г
+  "тыс.т":    {category: mass, multiplier: 1000000000.0, offset: 0.0}
+  "млн т":    {category: mass, multiplier: 1000000000000.0, offset: 0.0} # 1e6 т = 1e12 г
+  "млн тонн": {category: mass, multiplier: 1000000000000.0, offset: 0.0}
+  "млрд т":   {category: mass, multiplier: 1000000000000000.0, offset: 0.0} # 1e9 т = 1e15 г
+
+  # Массовый расход → т/сут. «Мощность» угольного микроразреза «10–200 тыс. т/год».
+  # 1 тыс. т/год = 1000 т / 365 сут = 2.73973 т/сут (согласовано с базовой «т/год»).
+  "тыс. т/год": {category: mass_rate, multiplier: 2.73972603, offset: 0.0}
+  "тыс. т/г":   {category: mass_rate, multiplier: 2.73972603, offset: 0.0}
+
+  # Давление → МПа. Модуль Юнга «E, ГПа = 80»; лабораторное давление обжатия в Н/м².
+  # 1 ГПа = 1000 МПа; 1 Н/м² = 1 Па = 1e-6 МПа — точно.
+  "ГПа":      {category: pressure, multiplier: 1000.0, offset: 0.0}
+  "GPa":      {category: pressure, multiplier: 1000.0, offset: 0.0}
+  "Н/м2":     {category: pressure, multiplier: 0.000001, offset: 0.0}
+  "Н/м²":     {category: pressure, multiplier: 0.000001, offset: 0.0}
+  "N/m2":     {category: pressure, multiplier: 0.000001, offset: 0.0}
+  "N/m²":     {category: pressure, multiplier: 0.000001, offset: 0.0}
+
+  # Плотность → г/см³. «Плотность γ, т/м3 = 2,9». Численно 1 т/м³ = 1 г/см³ — точно.
+  "т/м3":     {category: density, multiplier: 1.0, offset: 0.0}
+  "т/м³":     {category: density, multiplier: 1.0, offset: 0.0}
+  "t/m3":     {category: density, multiplier: 1.0, offset: 0.0}
+  "t/m³":     {category: density, multiplier: 1.0, offset: 0.0}
+
+  # Длина → м. Протяжённость дорог/скважин («105 км», «до 2500 км»; «1,5 метров»).
+  "км":       {category: length, multiplier: 1000.0, offset: 0.0}
+  "km":       {category: length, multiplier: 1000.0, offset: 0.0}
+  "метров":   {category: length, multiplier: 1.0, offset: 0.0}
+  "метра":    {category: length, multiplier: 1.0, offset: 0.0}
+
+  # Скорость → м/с. Скорость записи каротажа «120 м/ч», проходка. 1 м/ч = 1/3600 м/с.
+  "м/ч":      {category: velocity, multiplier: 0.000277778, offset: 0.0}
+  "m/h":      {category: velocity, multiplier: 0.000277778, offset: 0.0}
+
+  # Время → мин. Сутки уже есть; добавляем «дней» (=сут) и «мс» (миллисекунда:
+  # шаг дискретизации сейсмозаписи, интервалы замедления КЗВ). 1 сут = 1440 мин;
+  # 1 мс = 1e-3 с = 1/60000 мин — точно. ВНИМАНИЕ: «год/лет/мес.» НЕ добавлены —
+  # календарная длительность не строго однозначна (см. отчёт человеку).
+  "дней":     {category: time, multiplier: 1440.0, offset: 0.0}
+  "дня":      {category: time, multiplier: 1440.0, offset: 0.0}
+  "день":     {category: time, multiplier: 1440.0, offset: 0.0}
+  "мс":       {category: time, multiplier: 0.0000166667, offset: 0.0}
+  "ms":       {category: time, multiplier: 0.0000166667, offset: 0.0}
