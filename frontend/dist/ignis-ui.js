@@ -25160,7 +25160,7 @@ ${block.trim()}
     child_ctx[41] = list[i];
     return child_ctx;
   }
-  function create_if_block_74(ctx) {
+  function create_if_block_84(ctx) {
     let div2;
     let div0;
     let span;
@@ -25170,8 +25170,6 @@ ${block.trim()}
     let div1;
     let each_blocks = [];
     let each_1_lookup = /* @__PURE__ */ new Map();
-    let t3;
-    let current;
     let mounted;
     let dispose;
     let each_value_1 = ensure_array_like(
@@ -25187,10 +25185,6 @@ ${block.trim()}
       let key = get_key(child_ctx);
       each_1_lookup.set(key, each_blocks[i] = create_each_block_14(key, child_ctx));
     }
-    let if_block = (
-      /*activeGraph*/
-      ctx[9] && create_if_block_84(ctx)
-    );
     return {
       c() {
         div2 = element("div");
@@ -25205,9 +25199,6 @@ ${block.trim()}
         for (let i = 0; i < each_blocks.length; i += 1) {
           each_blocks[i].c();
         }
-        t3 = space();
-        if (if_block)
-          if_block.c();
         attr(button, "class", "agent-chat-new-btn");
         attr(button, "title", "New Chat");
         attr(div0, "class", "agent-sessions-panel-header");
@@ -25227,10 +25218,6 @@ ${block.trim()}
             each_blocks[i].m(div1, null);
           }
         }
-        append(div2, t3);
-        if (if_block)
-          if_block.m(div2, null);
-        current = true;
         if (!mounted) {
           dispose = listen(
             button,
@@ -25250,39 +25237,6 @@ ${block.trim()}
           );
           each_blocks = update_keyed_each(each_blocks, dirty, get_key, 1, ctx2, each_value_1, each_1_lookup, div1, destroy_block, create_each_block_14, null, get_each_context_14);
         }
-        if (
-          /*activeGraph*/
-          ctx2[9]
-        ) {
-          if (if_block) {
-            if_block.p(ctx2, dirty);
-            if (dirty[0] & /*activeGraph*/
-            512) {
-              transition_in(if_block, 1);
-            }
-          } else {
-            if_block = create_if_block_84(ctx2);
-            if_block.c();
-            transition_in(if_block, 1);
-            if_block.m(div2, null);
-          }
-        } else if (if_block) {
-          group_outros();
-          transition_out(if_block, 1, 1, () => {
-            if_block = null;
-          });
-          check_outros();
-        }
-      },
-      i(local) {
-        if (current)
-          return;
-        transition_in(if_block);
-        current = true;
-      },
-      o(local) {
-        transition_out(if_block);
-        current = false;
       },
       d(detaching) {
         if (detaching) {
@@ -25291,8 +25245,6 @@ ${block.trim()}
         for (let i = 0; i < each_blocks.length; i += 1) {
           each_blocks[i].d();
         }
-        if (if_block)
-          if_block.d();
         mounted = false;
         dispose();
       }
@@ -25451,7 +25403,358 @@ ${block.trim()}
       }
     };
   }
-  function create_if_block_84(ctx) {
+  function create_if_block_74(ctx) {
+    let div;
+    return {
+      c() {
+        div = element("div");
+        div.textContent = `${PLACEHOLDER}`;
+        attr(div, "class", "agent-chat-placeholder");
+      },
+      m(target, anchor) {
+        insert(target, div, anchor);
+      },
+      p: noop,
+      d(detaching) {
+        if (detaching) {
+          detach(div);
+        }
+      }
+    };
+  }
+  function create_if_block_64(ctx) {
+    let div1;
+    let div0;
+    let t_value = (
+      /*msg*/
+      ctx[38].content + ""
+    );
+    let t;
+    return {
+      c() {
+        div1 = element("div");
+        div0 = element("div");
+        t = text(t_value);
+        attr(div0, "class", "agent-chat-message-body");
+        attr(div1, "class", "agent-chat-message agent-chat-message--error");
+      },
+      m(target, anchor) {
+        insert(target, div1, anchor);
+        append(div1, div0);
+        append(div0, t);
+      },
+      p(ctx2, dirty) {
+        if (dirty[0] & /*messages*/
+        2 && t_value !== (t_value = /*msg*/
+        ctx2[38].content + ""))
+          set_data(t, t_value);
+      },
+      d(detaching) {
+        if (detaching) {
+          detach(div1);
+        }
+      }
+    };
+  }
+  function create_if_block_46(ctx) {
+    let div2;
+    let div0;
+    let t1;
+    let div1;
+    let raw_value = (
+      /*msg*/
+      ctx[38].html + ""
+    );
+    let t2;
+    let if_block = (
+      /*msg*/
+      ctx[38].subgraph && create_if_block_54(ctx)
+    );
+    return {
+      c() {
+        div2 = element("div");
+        div0 = element("div");
+        div0.innerHTML = `<span class="agent-chat-message-role">Agent</span>`;
+        t1 = space();
+        div1 = element("div");
+        t2 = space();
+        if (if_block)
+          if_block.c();
+        attr(div0, "class", "agent-chat-message-header");
+        attr(div1, "class", "agent-chat-message-body");
+        attr(div2, "class", "agent-chat-message agent-chat-message--agent");
+      },
+      m(target, anchor) {
+        insert(target, div2, anchor);
+        append(div2, div0);
+        append(div2, t1);
+        append(div2, div1);
+        div1.innerHTML = raw_value;
+        append(div2, t2);
+        if (if_block)
+          if_block.m(div2, null);
+      },
+      p(ctx2, dirty) {
+        if (dirty[0] & /*messages*/
+        2 && raw_value !== (raw_value = /*msg*/
+        ctx2[38].html + ""))
+          div1.innerHTML = raw_value;
+        ;
+        if (
+          /*msg*/
+          ctx2[38].subgraph
+        ) {
+          if (if_block) {
+            if_block.p(ctx2, dirty);
+          } else {
+            if_block = create_if_block_54(ctx2);
+            if_block.c();
+            if_block.m(div2, null);
+          }
+        } else if (if_block) {
+          if_block.d(1);
+          if_block = null;
+        }
+      },
+      d(detaching) {
+        if (detaching) {
+          detach(div2);
+        }
+        if (if_block)
+          if_block.d();
+      }
+    };
+  }
+  function create_if_block_38(ctx) {
+    let div1;
+    let div0;
+    let t_value = (
+      /*msg*/
+      ctx[38].content + ""
+    );
+    let t;
+    return {
+      c() {
+        div1 = element("div");
+        div0 = element("div");
+        t = text(t_value);
+        attr(div0, "class", "agent-chat-message-body");
+        attr(div1, "class", "agent-chat-message agent-chat-message--user");
+      },
+      m(target, anchor) {
+        insert(target, div1, anchor);
+        append(div1, div0);
+        append(div0, t);
+      },
+      p(ctx2, dirty) {
+        if (dirty[0] & /*messages*/
+        2 && t_value !== (t_value = /*msg*/
+        ctx2[38].content + ""))
+          set_data(t, t_value);
+      },
+      d(detaching) {
+        if (detaching) {
+          detach(div1);
+        }
+      }
+    };
+  }
+  function create_if_block_54(ctx) {
+    let button;
+    let mounted;
+    let dispose;
+    function click_handler_2() {
+      return (
+        /*click_handler_2*/
+        ctx[24](
+          /*msg*/
+          ctx[38]
+        )
+      );
+    }
+    return {
+      c() {
+        button = element("button");
+        button.textContent = "Open Graph";
+        attr(button, "class", "agent-open-graph-btn");
+      },
+      m(target, anchor) {
+        insert(target, button, anchor);
+        if (!mounted) {
+          dispose = listen(button, "click", click_handler_2);
+          mounted = true;
+        }
+      },
+      p(new_ctx, dirty) {
+        ctx = new_ctx;
+      },
+      d(detaching) {
+        if (detaching) {
+          detach(button);
+        }
+        mounted = false;
+        dispose();
+      }
+    };
+  }
+  function create_each_block10(key_1, ctx) {
+    let first;
+    let if_block_anchor;
+    function select_block_type(ctx2, dirty) {
+      if (
+        /*msg*/
+        ctx2[38].role === "user"
+      )
+        return create_if_block_38;
+      if (
+        /*msg*/
+        ctx2[38].role === "agent"
+      )
+        return create_if_block_46;
+      if (
+        /*msg*/
+        ctx2[38].role === "error"
+      )
+        return create_if_block_64;
+    }
+    let current_block_type = select_block_type(ctx, [-1, -1]);
+    let if_block = current_block_type && current_block_type(ctx);
+    return {
+      key: key_1,
+      first: null,
+      c() {
+        first = empty();
+        if (if_block)
+          if_block.c();
+        if_block_anchor = empty();
+        this.first = first;
+      },
+      m(target, anchor) {
+        insert(target, first, anchor);
+        if (if_block)
+          if_block.m(target, anchor);
+        insert(target, if_block_anchor, anchor);
+      },
+      p(new_ctx, dirty) {
+        ctx = new_ctx;
+        if (current_block_type === (current_block_type = select_block_type(ctx, dirty)) && if_block) {
+          if_block.p(ctx, dirty);
+        } else {
+          if (if_block)
+            if_block.d(1);
+          if_block = current_block_type && current_block_type(ctx);
+          if (if_block) {
+            if_block.c();
+            if_block.m(if_block_anchor.parentNode, if_block_anchor);
+          }
+        }
+      },
+      d(detaching) {
+        if (detaching) {
+          detach(first);
+          detach(if_block_anchor);
+        }
+        if (if_block) {
+          if_block.d(detaching);
+        }
+      }
+    };
+  }
+  function create_if_block_113(ctx) {
+    let if_block_anchor;
+    function select_block_type_1(ctx2, dirty) {
+      if (
+        /*loadingHtml*/
+        ctx2[0]
+      )
+        return create_if_block_29;
+      return create_else_block8;
+    }
+    let current_block_type = select_block_type_1(ctx, [-1, -1]);
+    let if_block = current_block_type(ctx);
+    return {
+      c() {
+        if_block.c();
+        if_block_anchor = empty();
+      },
+      m(target, anchor) {
+        if_block.m(target, anchor);
+        insert(target, if_block_anchor, anchor);
+      },
+      p(ctx2, dirty) {
+        if (current_block_type === (current_block_type = select_block_type_1(ctx2, dirty)) && if_block) {
+          if_block.p(ctx2, dirty);
+        } else {
+          if_block.d(1);
+          if_block = current_block_type(ctx2);
+          if (if_block) {
+            if_block.c();
+            if_block.m(if_block_anchor.parentNode, if_block_anchor);
+          }
+        }
+      },
+      d(detaching) {
+        if (detaching) {
+          detach(if_block_anchor);
+        }
+        if_block.d(detaching);
+      }
+    };
+  }
+  function create_else_block8(ctx) {
+    let div;
+    return {
+      c() {
+        div = element("div");
+        div.textContent = "Agent is thinking...";
+        attr(div, "class", "agent-chat-loading");
+      },
+      m(target, anchor) {
+        insert(target, div, anchor);
+      },
+      p: noop,
+      d(detaching) {
+        if (detaching) {
+          detach(div);
+        }
+      }
+    };
+  }
+  function create_if_block_29(ctx) {
+    let html_tag;
+    let html_anchor;
+    return {
+      c() {
+        html_tag = new HtmlTag(false);
+        html_anchor = empty();
+        html_tag.a = html_anchor;
+      },
+      m(target, anchor) {
+        html_tag.m(
+          /*loadingHtml*/
+          ctx[0],
+          target,
+          anchor
+        );
+        insert(target, html_anchor, anchor);
+      },
+      p(ctx2, dirty) {
+        if (dirty[0] & /*loadingHtml*/
+        1)
+          html_tag.p(
+            /*loadingHtml*/
+            ctx2[0]
+          );
+      },
+      d(detaching) {
+        if (detaching) {
+          detach(html_anchor);
+          html_tag.d();
+        }
+      }
+    };
+  }
+  function create_if_block17(ctx) {
     let div2;
     let div0;
     let span;
@@ -25563,357 +25866,6 @@ ${block.trim()}
       }
     };
   }
-  function create_if_block_64(ctx) {
-    let div;
-    return {
-      c() {
-        div = element("div");
-        div.textContent = `${PLACEHOLDER}`;
-        attr(div, "class", "agent-chat-placeholder");
-      },
-      m(target, anchor) {
-        insert(target, div, anchor);
-      },
-      p: noop,
-      d(detaching) {
-        if (detaching) {
-          detach(div);
-        }
-      }
-    };
-  }
-  function create_if_block_54(ctx) {
-    let div1;
-    let div0;
-    let t_value = (
-      /*msg*/
-      ctx[38].content + ""
-    );
-    let t;
-    return {
-      c() {
-        div1 = element("div");
-        div0 = element("div");
-        t = text(t_value);
-        attr(div0, "class", "agent-chat-message-body");
-        attr(div1, "class", "agent-chat-message agent-chat-message--error");
-      },
-      m(target, anchor) {
-        insert(target, div1, anchor);
-        append(div1, div0);
-        append(div0, t);
-      },
-      p(ctx2, dirty) {
-        if (dirty[0] & /*messages*/
-        2 && t_value !== (t_value = /*msg*/
-        ctx2[38].content + ""))
-          set_data(t, t_value);
-      },
-      d(detaching) {
-        if (detaching) {
-          detach(div1);
-        }
-      }
-    };
-  }
-  function create_if_block_38(ctx) {
-    let div2;
-    let div0;
-    let t1;
-    let div1;
-    let raw_value = (
-      /*msg*/
-      ctx[38].html + ""
-    );
-    let t2;
-    let if_block = (
-      /*msg*/
-      ctx[38].subgraph && create_if_block_46(ctx)
-    );
-    return {
-      c() {
-        div2 = element("div");
-        div0 = element("div");
-        div0.innerHTML = `<span class="agent-chat-message-role">Agent</span>`;
-        t1 = space();
-        div1 = element("div");
-        t2 = space();
-        if (if_block)
-          if_block.c();
-        attr(div0, "class", "agent-chat-message-header");
-        attr(div1, "class", "agent-chat-message-body");
-        attr(div2, "class", "agent-chat-message agent-chat-message--agent");
-      },
-      m(target, anchor) {
-        insert(target, div2, anchor);
-        append(div2, div0);
-        append(div2, t1);
-        append(div2, div1);
-        div1.innerHTML = raw_value;
-        append(div2, t2);
-        if (if_block)
-          if_block.m(div2, null);
-      },
-      p(ctx2, dirty) {
-        if (dirty[0] & /*messages*/
-        2 && raw_value !== (raw_value = /*msg*/
-        ctx2[38].html + ""))
-          div1.innerHTML = raw_value;
-        ;
-        if (
-          /*msg*/
-          ctx2[38].subgraph
-        ) {
-          if (if_block) {
-            if_block.p(ctx2, dirty);
-          } else {
-            if_block = create_if_block_46(ctx2);
-            if_block.c();
-            if_block.m(div2, null);
-          }
-        } else if (if_block) {
-          if_block.d(1);
-          if_block = null;
-        }
-      },
-      d(detaching) {
-        if (detaching) {
-          detach(div2);
-        }
-        if (if_block)
-          if_block.d();
-      }
-    };
-  }
-  function create_if_block_29(ctx) {
-    let div1;
-    let div0;
-    let t_value = (
-      /*msg*/
-      ctx[38].content + ""
-    );
-    let t;
-    return {
-      c() {
-        div1 = element("div");
-        div0 = element("div");
-        t = text(t_value);
-        attr(div0, "class", "agent-chat-message-body");
-        attr(div1, "class", "agent-chat-message agent-chat-message--user");
-      },
-      m(target, anchor) {
-        insert(target, div1, anchor);
-        append(div1, div0);
-        append(div0, t);
-      },
-      p(ctx2, dirty) {
-        if (dirty[0] & /*messages*/
-        2 && t_value !== (t_value = /*msg*/
-        ctx2[38].content + ""))
-          set_data(t, t_value);
-      },
-      d(detaching) {
-        if (detaching) {
-          detach(div1);
-        }
-      }
-    };
-  }
-  function create_if_block_46(ctx) {
-    let button;
-    let mounted;
-    let dispose;
-    function click_handler_2() {
-      return (
-        /*click_handler_2*/
-        ctx[24](
-          /*msg*/
-          ctx[38]
-        )
-      );
-    }
-    return {
-      c() {
-        button = element("button");
-        button.textContent = "Open Graph";
-        attr(button, "class", "agent-open-graph-btn");
-      },
-      m(target, anchor) {
-        insert(target, button, anchor);
-        if (!mounted) {
-          dispose = listen(button, "click", click_handler_2);
-          mounted = true;
-        }
-      },
-      p(new_ctx, dirty) {
-        ctx = new_ctx;
-      },
-      d(detaching) {
-        if (detaching) {
-          detach(button);
-        }
-        mounted = false;
-        dispose();
-      }
-    };
-  }
-  function create_each_block10(key_1, ctx) {
-    let first;
-    let if_block_anchor;
-    function select_block_type(ctx2, dirty) {
-      if (
-        /*msg*/
-        ctx2[38].role === "user"
-      )
-        return create_if_block_29;
-      if (
-        /*msg*/
-        ctx2[38].role === "agent"
-      )
-        return create_if_block_38;
-      if (
-        /*msg*/
-        ctx2[38].role === "error"
-      )
-        return create_if_block_54;
-    }
-    let current_block_type = select_block_type(ctx, [-1, -1]);
-    let if_block = current_block_type && current_block_type(ctx);
-    return {
-      key: key_1,
-      first: null,
-      c() {
-        first = empty();
-        if (if_block)
-          if_block.c();
-        if_block_anchor = empty();
-        this.first = first;
-      },
-      m(target, anchor) {
-        insert(target, first, anchor);
-        if (if_block)
-          if_block.m(target, anchor);
-        insert(target, if_block_anchor, anchor);
-      },
-      p(new_ctx, dirty) {
-        ctx = new_ctx;
-        if (current_block_type === (current_block_type = select_block_type(ctx, dirty)) && if_block) {
-          if_block.p(ctx, dirty);
-        } else {
-          if (if_block)
-            if_block.d(1);
-          if_block = current_block_type && current_block_type(ctx);
-          if (if_block) {
-            if_block.c();
-            if_block.m(if_block_anchor.parentNode, if_block_anchor);
-          }
-        }
-      },
-      d(detaching) {
-        if (detaching) {
-          detach(first);
-          detach(if_block_anchor);
-        }
-        if (if_block) {
-          if_block.d(detaching);
-        }
-      }
-    };
-  }
-  function create_if_block17(ctx) {
-    let if_block_anchor;
-    function select_block_type_1(ctx2, dirty) {
-      if (
-        /*loadingHtml*/
-        ctx2[0]
-      )
-        return create_if_block_113;
-      return create_else_block8;
-    }
-    let current_block_type = select_block_type_1(ctx, [-1, -1]);
-    let if_block = current_block_type(ctx);
-    return {
-      c() {
-        if_block.c();
-        if_block_anchor = empty();
-      },
-      m(target, anchor) {
-        if_block.m(target, anchor);
-        insert(target, if_block_anchor, anchor);
-      },
-      p(ctx2, dirty) {
-        if (current_block_type === (current_block_type = select_block_type_1(ctx2, dirty)) && if_block) {
-          if_block.p(ctx2, dirty);
-        } else {
-          if_block.d(1);
-          if_block = current_block_type(ctx2);
-          if (if_block) {
-            if_block.c();
-            if_block.m(if_block_anchor.parentNode, if_block_anchor);
-          }
-        }
-      },
-      d(detaching) {
-        if (detaching) {
-          detach(if_block_anchor);
-        }
-        if_block.d(detaching);
-      }
-    };
-  }
-  function create_else_block8(ctx) {
-    let div;
-    return {
-      c() {
-        div = element("div");
-        div.textContent = "Agent is thinking...";
-        attr(div, "class", "agent-chat-loading");
-      },
-      m(target, anchor) {
-        insert(target, div, anchor);
-      },
-      p: noop,
-      d(detaching) {
-        if (detaching) {
-          detach(div);
-        }
-      }
-    };
-  }
-  function create_if_block_113(ctx) {
-    let html_tag;
-    let html_anchor;
-    return {
-      c() {
-        html_tag = new HtmlTag(false);
-        html_anchor = empty();
-        html_tag.a = html_anchor;
-      },
-      m(target, anchor) {
-        html_tag.m(
-          /*loadingHtml*/
-          ctx[0],
-          target,
-          anchor
-        );
-        insert(target, html_anchor, anchor);
-      },
-      p(ctx2, dirty) {
-        if (dirty[0] & /*loadingHtml*/
-        1)
-          html_tag.p(
-            /*loadingHtml*/
-            ctx2[0]
-          );
-      },
-      d(detaching) {
-        if (detaching) {
-          detach(html_anchor);
-          html_tag.d();
-        }
-      }
-    };
-  }
   function create_fragment48(ctx) {
     let div5;
     let div1;
@@ -25933,21 +25885,22 @@ ${block.trim()}
     let each_1_lookup = /* @__PURE__ */ new Map();
     let t6;
     let t7;
+    let t8;
     let div4;
     let textarea;
-    let t8;
-    let button2;
     let t9;
+    let button2;
+    let t10;
     let current;
     let mounted;
     let dispose;
     let if_block0 = (
       /*showSessions*/
-      ctx[8] && create_if_block_74(ctx)
+      ctx[8] && create_if_block_84(ctx)
     );
     let if_block1 = (
       /*messages*/
-      ctx[1].length === 0 && create_if_block_64(ctx)
+      ctx[1].length === 0 && create_if_block_74(ctx)
     );
     let each_value = ensure_array_like(
       /*messages*/
@@ -25968,7 +25921,11 @@ ${block.trim()}
     }
     let if_block2 = (
       /*loading*/
-      ctx[5] && create_if_block17(ctx)
+      ctx[5] && create_if_block_113(ctx)
+    );
+    let if_block3 = (
+      /*activeGraph*/
+      ctx[9] && create_if_block17(ctx)
     );
     return {
       c() {
@@ -26002,11 +25959,14 @@ ${block.trim()}
         if (if_block2)
           if_block2.c();
         t7 = space();
+        if (if_block3)
+          if_block3.c();
+        t8 = space();
         div4 = element("div");
         textarea = element("textarea");
-        t8 = space();
+        t9 = space();
         button2 = element("button");
-        t9 = text("Send");
+        t10 = text("Send");
         attr(button0, "class", "agent-chat-sessions-btn");
         attr(button0, "title", "Sessions");
         attr(button1, "class", "agent-chat-new-btn");
@@ -26054,7 +26014,10 @@ ${block.trim()}
         if (if_block2)
           if_block2.m(div2, null);
         ctx[25](div2);
-        append(div5, t7);
+        append(div3, t7);
+        if (if_block3)
+          if_block3.m(div3, null);
+        append(div5, t8);
         append(div5, div4);
         append(div4, textarea);
         set_input_value(
@@ -26062,9 +26025,9 @@ ${block.trim()}
           /*input*/
           ctx[4]
         );
-        append(div4, t8);
+        append(div4, t9);
         append(div4, button2);
-        append(button2, t9);
+        append(button2, t10);
         current = true;
         if (!mounted) {
           dispose = [
@@ -26123,22 +26086,14 @@ ${block.trim()}
         ) {
           if (if_block0) {
             if_block0.p(ctx2, dirty);
-            if (dirty[0] & /*showSessions*/
-            256) {
-              transition_in(if_block0, 1);
-            }
           } else {
-            if_block0 = create_if_block_74(ctx2);
+            if_block0 = create_if_block_84(ctx2);
             if_block0.c();
-            transition_in(if_block0, 1);
             if_block0.m(div3, t4);
           }
         } else if (if_block0) {
-          group_outros();
-          transition_out(if_block0, 1, 1, () => {
-            if_block0 = null;
-          });
-          check_outros();
+          if_block0.d(1);
+          if_block0 = null;
         }
         if (
           /*messages*/
@@ -26147,7 +26102,7 @@ ${block.trim()}
           if (if_block1) {
             if_block1.p(ctx2, dirty);
           } else {
-            if_block1 = create_if_block_64(ctx2);
+            if_block1 = create_if_block_74(ctx2);
             if_block1.c();
             if_block1.m(div2, t5);
           }
@@ -26170,13 +26125,36 @@ ${block.trim()}
           if (if_block2) {
             if_block2.p(ctx2, dirty);
           } else {
-            if_block2 = create_if_block17(ctx2);
+            if_block2 = create_if_block_113(ctx2);
             if_block2.c();
             if_block2.m(div2, null);
           }
         } else if (if_block2) {
           if_block2.d(1);
           if_block2 = null;
+        }
+        if (
+          /*activeGraph*/
+          ctx2[9]
+        ) {
+          if (if_block3) {
+            if_block3.p(ctx2, dirty);
+            if (dirty[0] & /*activeGraph*/
+            512) {
+              transition_in(if_block3, 1);
+            }
+          } else {
+            if_block3 = create_if_block17(ctx2);
+            if_block3.c();
+            transition_in(if_block3, 1);
+            if_block3.m(div3, null);
+          }
+        } else if (if_block3) {
+          group_outros();
+          transition_out(if_block3, 1, 1, () => {
+            if_block3 = null;
+          });
+          check_outros();
         }
         if (dirty[0] & /*input*/
         16) {
@@ -26195,11 +26173,11 @@ ${block.trim()}
       i(local) {
         if (current)
           return;
-        transition_in(if_block0);
+        transition_in(if_block3);
         current = true;
       },
       o(local) {
-        transition_out(if_block0);
+        transition_out(if_block3);
         current = false;
       },
       d(detaching) {
@@ -26216,6 +26194,8 @@ ${block.trim()}
         if (if_block2)
           if_block2.d();
         ctx[25](null);
+        if (if_block3)
+          if_block3.d();
         mounted = false;
         run_all(dispose);
       }
