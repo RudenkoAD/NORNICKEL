@@ -81,6 +81,8 @@ async def process_document(
     force: bool = False,
     doc_timeout: float = 600.0,
     defer_embeddings: bool = False,
+    trust_override: Optional[str] = None,
+    access_override: Optional[str] = None,
 ) -> dict[str, Any]:
     """Прогоняет один файл через весь конвейер §4. Возвращает per-doc отчёт.
 
@@ -141,7 +143,8 @@ async def process_document(
         llm, parsed.text[:METADATA_HEAD_CHARS], path.name
     )
     trust_level, access_level = metadata_mod.assign_trust_access(
-        meta.get("doc_type"), parsed.source_path
+        meta.get("doc_type"), parsed.source_path,
+        trust_override=trust_override, access_override=access_override,
     )
     doc_meta: dict[str, Any] = {
         "doc_id": doc_id,

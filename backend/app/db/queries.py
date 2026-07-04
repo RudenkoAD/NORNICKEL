@@ -149,10 +149,16 @@ def build_strict_filters(
         num_rel_types = list(NUMERIC_RELS)
         for i, nf in enumerate(numeric):
             p, mn, mx = f"num{i}_param", f"num{i}_min", f"num{i}_max"
+            # Пересечение интервалов с ПОЛУОТКРЫТЫМИ границами (04.07, adversarial
+            # review): value_min/value_max = null кодирует ±inf (§3.1). В Cypher
+            # `null <= x` = null = FALSE в WHERE — без IS NULL факт «≤300 мг/л»
+            # (value_min=null) НИКОГДА не проходил фильтр, ломая флагманский запрос
+            # кейса «сульфаты ≤300». null-граница = «нет ограничения с этой стороны».
             where.append(
                 f"EXISTS {{ MATCH (x)-[r]->(p:{Node.PARAMETER} {{canonical_id: ${p}}}) "
                 f"WHERE type(r) IN $numeric_rel_types AND r.source_doc_id = d.doc_id "
-                f"AND r.value_min <= ${mx} AND r.value_max >= ${mn} "
+                f"AND (r.value_min IS NULL OR ${mx} IS NULL OR r.value_min <= ${mx}) "
+                f"AND (r.value_max IS NULL OR ${mn} IS NULL OR r.value_max >= ${mn}) "
                 f"AND r.needs_review IS NULL AND r.deleted IS NULL }}"
             )
             params[p] = nf["param"]
@@ -421,6 +427,9 @@ def format_subgraph(graph: Any, role: str,
             dropped_eids.add(node.element_id)
             continue
 
+        # embedding (256 float) не нужен в UI/SSE и раздувает ответ ~325 КБ на
+        # review-подграф (04.07, adversarial review) — вырезаем из props.
+        props.pop("embedding", None)
         key = _node_stable_key(node)
         nodes_out.append({
             "key": key,
@@ -436,11 +445,20 @@ def format_subgraph(graph: Any, role: str,
             continue
         if rel.start_node.element_id in dropped_eids or rel.end_node.element_id in dropped_eids:
             continue
+        # RBAC (04.07, adversarial review): фактическое ребро идёт между ПУБЛИЧНЫМИ
+        # каноническими узлами (Material/Process/Parameter видны partner всегда), но
+        # его props несут провенанс из internal-документа — дословный `quote` и
+        # числовые интервалы. Оба конца выживают → ребро не дропалось → утечка.
+        # Для partner отбрасываем ребро целиком: оно И ЕСТЬ факт из закрытого дока.
+        if is_partner and str(rel.get("source_doc_id")) in nonpublic_doc_ids:
+            continue
+        props = dict(rel.items())
+        props.pop("embedding", None)  # рёбра эмбеддингов не несут, но единообразно
         edges_out.append({
             "from": _node_stable_key(rel.start_node),
             "to": _node_stable_key(rel.end_node),
             "type": rel.type,
-            "props": dict(rel.items()),
+            "props": props,
         })
 
     return {"nodes": nodes_out, "edges": edges_out}

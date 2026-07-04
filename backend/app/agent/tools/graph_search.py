@@ -21,6 +21,7 @@ import logging
 from typing import Any, Optional
 
 from app.agent.tools.semantic_search import _surname as _sem_surname
+from app.config import PARTNER_ROLE
 from app.db.constants import Node, Rel
 from app.db.neo4j_client import Neo4jClient, get_client
 from app.db.queries import (
@@ -41,10 +42,15 @@ _HUB_NEIGHBOUR_LIMIT = 25
 
 # cite_key поддерживающих документов клеймов + строк-эксперты собираются здесь же,
 # чтобы синтез (§5.3) получил число подтверждающих источников по каждому Claim.
+# RBAC (04.07): для partner отдаём cite_key ТОЛЬКО public-документов — иначе
+# автор+год internal-документа утекает в citations через SUPPORTED_BY.
+# fail-closed: d.access_level='public' при null/потере → false → скрыто.
 _CITE_KEY_QUERY = f"""
 MATCH (c:{Node.CLAIM}) WHERE c.claim_id IN $claim_ids AND c.superseded_by IS NULL
 OPTIONAL MATCH (c)-[sb:{Rel.SUPPORTED_BY}]->(d:{Node.DOCUMENT})
 WHERE sb.deleted IS NULL
+  AND (NOT $is_partner OR (d.access_level = 'public'
+       AND NOT d.doc_id IN $nonpublic_doc_ids))
 RETURN c.claim_id AS claim_id, collect(DISTINCT {{authors: d.authors, year: d.year}}) AS docs
 """.strip()
 
@@ -96,13 +102,17 @@ def _hub_neighbour_eids(db: Neo4jClient, hub_eids: list[str]) -> list[str]:
     return extra
 
 
-def _claim_stats(db: Neo4jClient, serialized: dict[str, Any]) -> list[dict[str, Any]]:
+def _claim_stats(db: Neo4jClient, serialized: dict[str, Any], role: str = "",
+                 nonpublic_doc_ids: Optional[set[str]] = None) -> list[dict[str, Any]]:
     """Статистика по Claim'ам подграфа (§5.2): SUPPORTED_BY, CONTRADICTS, cite_key.
 
     Читаем прямо из сериализованного подграфа (узлы/рёбра уже отфильтрованы по роли
     format_subgraph — partner-internal claims сюда не попадут). cite_key поддерживающих
-    документов достаём отдельным запросом (нужны authors/year Document).
+    документов достаём отдельным запросом с partner-фильтром доступа (04.07: иначе
+    автор+год internal-документа утекает через SUPPORTED_BY публичного Claim).
     """
+    is_partner = role == PARTNER_ROLE
+    nonpublic_doc_ids = nonpublic_doc_ids or set()
     nodes = serialized.get("nodes", [])
     edges = serialized.get("edges", [])
 
@@ -125,7 +135,11 @@ def _claim_stats(db: Neo4jClient, serialized: dict[str, Any]) -> list[dict[str, 
 
     # cite_key поддерживающих документов по каждому Claim.
     cite_keys: dict[str, list[str]] = {cid: [] for cid in claim_ids}
-    for r in db.read(_CITE_KEY_QUERY, {"claim_ids": claim_ids}):
+    for r in db.read(_CITE_KEY_QUERY, {
+        "claim_ids": claim_ids,
+        "is_partner": is_partner,
+        "nonpublic_doc_ids": list(nonpublic_doc_ids),
+    }):
         cid = r["claim_id"]
         keys: list[str] = []
         for doc in r.get("docs") or []:
@@ -233,8 +247,13 @@ def run(
     if ref_ids:
         access_rows = db.read(DOC_ACCESS_MAP, {"doc_ids": list(ref_ids)})
         nonpublic = {
-            r["doc_id"] for r in access_rows if r.get("access_level") != "public"
+            str(r["doc_id"]) for r in access_rows if r.get("access_level") != "public"
         }
+        # fail-closed (04.07, adversarial review): doc_id, не вернувшийся из
+        # DOC_ACCESS_MAP (Document потерян/без access_level), считаем непубличным —
+        # иначе partner получает контент документа-сироты. Совпадает с main.py.
+        known = {str(r["doc_id"]) for r in access_rows}
+        nonpublic |= {str(x) for x in ref_ids if str(x) not in known}
 
     serialized = format_subgraph(
         graph,
@@ -243,7 +262,7 @@ def run(
         nonpublic_doc_ids=nonpublic,
     )
 
-    stats = _claim_stats(db, serialized)
+    stats = _claim_stats(db, serialized, role=role, nonpublic_doc_ids=nonpublic)
     experts = _experts(serialized)
     citations = _citations(stats)
 

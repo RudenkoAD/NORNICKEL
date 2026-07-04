@@ -251,6 +251,7 @@ async def post_documents(
     from app.ingest import canonizer as canonizer_mod
     from app.ingest import metadata as metadata_mod
     from app.ingest import units as units_mod
+    from app.ingest.parser import UnsupportedFormat
     from app.llm.yandex import LLMError, YandexLLM
     from scripts.ingest_corpus import process_document
 
@@ -280,32 +281,22 @@ async def post_documents(
         # process_document сам делает parse→extract→…→write. form-оверрайды access/trust
         # process_document не принимает напрямую — применяем их через monkeypatch-free
         # путь: прокидываем в assign_trust_access, обернув на время вызова.
-        orig_assign = metadata_mod.assign_trust_access
-
-        def _assign_with_override(doc_type, source_path, trust_override=None, access_override=None):
-            return orig_assign(
-                doc_type,
-                source_path,
-                trust_override=trust_level or trust_override,
-                access_override=access_level or access_override,
-            )
-
-        metadata_mod.assign_trust_access = _assign_with_override  # type: ignore[assignment]
-        try:
-            report = await asyncio.wait_for(
-                process_document(
-                    tmp_path,
-                    llm=llm,
-                    canonizer=canonizer,
-                    registry=registry,
-                    client=client,
-                    dry_run=False,
-                    force=False,
-                ),
-                timeout=600.0,
-            )
-        finally:
-            metadata_mod.assign_trust_access = orig_assign  # type: ignore[assignment]
+        # Оверрайды доступа передаём ЯВНО (04.07, adversarial review): monkeypatch
+        # глобала assign_trust_access путал access_level между параллельными загрузками.
+        report = await asyncio.wait_for(
+            process_document(
+                tmp_path,
+                llm=llm,
+                canonizer=canonizer,
+                registry=registry,
+                client=client,
+                dry_run=False,
+                force=False,
+                trust_override=trust_level or None,
+                access_override=access_level or None,
+            ),
+            timeout=600.0,
+        )
 
         # Алерт unknown_units (§4.3): из реестра единиц, накопленного за импорт.
         try:
@@ -322,8 +313,15 @@ async def post_documents(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"LLM недоступна при импорте: {err}",
         ) from err
-    except (RuntimeError, ValueError) as err:
-        # Скан без текста / неподдерживаемый формат и т.п. — 400 с причиной.
+    except asyncio.TimeoutError as err:
+        # Сторож импорта (04.07): явная 504, не 500-трейс (инвариант №9).
+        raise HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail="Импорт документа превысил таймаут (600 c) — файл слишком большой "
+                   "или LLM отвечает медленно.",
+        ) from err
+    except (RuntimeError, ValueError, UnsupportedFormat) as err:
+        # Скан без текста / неподдерживаемый формат — 400 с причиной (04.07).
         raise _bad_request(str(err)) from err
     finally:
         try:

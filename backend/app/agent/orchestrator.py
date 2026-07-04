@@ -450,19 +450,27 @@ async def _synthesize(
     return await llm.chat_text(system=system, user=user, model=_synth_model(), temperature=0.2)
 
 
-async def _stream_sentences(text: str) -> AsyncIterator[str]:
-    """Псевдо-стрим синтеза по предложениям (§задание: honest-компромисс без стрима апстрима).
+_STREAM_WINDOW = 60  # символов на псевдо-токен
 
-    Отдаём токены-предложения с сохранёнными разделителями, чтобы UI собрал исходный
-    markdown склейкой. Async-генератор, чтобы контракт был единообразно awaitable.
+
+async def _stream_sentences(text: str) -> AsyncIterator[str]:
+    """Псевдо-стрим синтеза окнами символов (§задание: honest-компромисс без стрима апстрима).
+
+    04.07 (adversarial review): режем ИСХОДНЫЙ текст на куски по границам слов, НЕ
+    реконструируя разделители — иначе `\\n\\n` markdown-таблиц (сцена compare)
+    схлопывался в пробел и таблица не рендерилась. Гарантия: ''.join(куски) == text.
     """
     if not text:
         return
-    parts = _SENTENCE_SPLIT.split(text)
-    n = len(parts)
-    for i, part in enumerate(parts):
-        # Возвращаем разделитель между предложениями (кроме последнего).
-        yield part if i == n - 1 else part + " "
+    i, n = 0, len(text)
+    while i < n:
+        end = min(i + _STREAM_WINDOW, n)
+        # Не рвём посреди слова: тянемся до ближайшего пробела/переноса за окном.
+        if end < n and not text[end].isspace():
+            cand = [p for p in (text.find(" ", end), text.find("\n", end)) if p != -1]
+            end = min(cand) + 1 if cand else n
+        yield text[i:end]
+        i = end
 
 
 def _gap_dimensions(plan: dict[str, Any]) -> dict[str, Optional[list[str]]]:

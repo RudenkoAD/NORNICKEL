@@ -574,3 +574,41 @@ def test_json_endpoint_serializes_neo4j_datetime(client, monkeypatch):
     assert resp.status_code == 200
     assert "2026-07-04T09:30:00" in resp.text
     assert "_DateTime__date" not in resp.text  # не утёк внутренний формат
+
+
+# ---------------------------------------------------------------------------
+# RBAC-утечки (04.07, adversarial review): partner НЕ должен видеть провенанс
+# рёбер из internal-документов через публичные канонические узлы.
+# ---------------------------------------------------------------------------
+def test_format_subgraph_partner_no_internal_edge_provenance():
+    """Ребро между публичными Material/Process с source_doc_id из internal-дока —
+    partner НЕ получает его дословную quote и числа (утечка контента §7)."""
+    from app.db.queries import format_subgraph
+
+    mat = _FakeNode(["Material"], {"canonical_id": "mat-ni", "name_ru": "никель"}, "e1")
+    proc = _FakeNode(["Process"], {"canonical_id": "proc-lx", "name_ru": "выщелачивание"}, "e2")
+    # оба конца ПУБЛИЧНЫ (канонические узлы), но факт извлечён из internal-дока.
+    rel = _FakeRel("HAS_CONDITION", proc, mat, {
+        "source_doc_id": "DOC_INT", "quote": "СЕКРЕТ: температура 60C (internal)",
+        "value_min": 58.0, "value_max": 62.0,
+    })
+    graph = _FakeGraph([mat, proc], [rel])
+
+    partner = format_subgraph(graph, "partner", nonpublic_doc_ids={"DOC_INT"})
+    # Ребро из internal-дока для partner отброшено целиком.
+    assert partner["edges"] == []
+    # А researcher видит и ребро, и quote.
+    researcher = format_subgraph(graph, "researcher", nonpublic_doc_ids={"DOC_INT"})
+    assert len(researcher["edges"]) == 1
+    assert "СЕКРЕТ" in researcher["edges"][0]["props"]["quote"]
+
+
+def test_format_subgraph_strips_embedding():
+    """embedding-массивы не утекают в UI/SSE-подграф (объём + гигиена)."""
+    from app.db.queries import format_subgraph
+
+    mat = _FakeNode(["Material"],
+                    {"canonical_id": "mat-ni", "name_ru": "никель",
+                     "embedding": [0.1] * 256}, "e1")
+    out = format_subgraph(_FakeGraph([mat], []), "researcher")
+    assert "embedding" not in out["nodes"][0]["props"]
