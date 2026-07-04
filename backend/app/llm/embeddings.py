@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import math
 from typing import Optional
 
 import httpx
@@ -149,6 +150,14 @@ def _extract_vector(data: dict, settings: Settings) -> list[float]:
     if not isinstance(vec_raw, list) or not vec_raw:
         raise ValueError(f"Ответ эмбеддинга без поля embedding: {data!r}")
     vec = [float(x) for x in vec_raw]
+    # Прокси может игнорировать параметр dimensions (в доках OpenRouter его нет) и
+    # вернуть полный вектор (3-large → 3072). Для OpenAI v3 матрёшечная нарезка
+    # «усечь + L2-нормализовать» официально эквивалентна dimensions=N — детерминизм
+    # тот же, пространство то же.
+    if prov == "openrouter" and len(vec) > settings.emb_dim:
+        head = vec[: settings.emb_dim]
+        norm = math.sqrt(sum(x * x for x in head)) or 1.0
+        vec = [x / norm for x in head]
     _assert_dim(vec, settings)
     return vec
 
