@@ -105,9 +105,13 @@ async def main() -> int:
         print(f"[{stamp}] залито {done}, в очереди {remaining}"
               + ("" if quota_alive else " (квота 429 — пауза)"))
         if remaining == 0:
-            print("Очередь пуста — все вектора на месте.")
-            break
-        if not args.loop:
+            if not args.loop:
+                print("Очередь пуста — все вектора на месте.")
+                break
+            # --loop: очередь опустеет и снова наполнится по мере импорта партий
+            # (--defer-embeddings) — ждём новых узлов, не выходим (04.07).
+            print(f"[{stamp}] очередь пуста — жду новые документы...")
+        elif not args.loop:
             break
         await asyncio.sleep(_PAUSE_BETWEEN_ROUNDS_S)
 
