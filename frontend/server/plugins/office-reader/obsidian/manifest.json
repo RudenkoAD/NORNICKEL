@@ -1,0 +1,9 @@
+{
+  "id": "ignis-office-reader",
+  "name": "Office Reader",
+  "version": "0.1.0",
+  "minAppVersion": "1.12.4",
+  "description": "Просмотр DOCX-файлов внутри Obsidian через mammoth — Ignis edition",
+  "author": "Ignis",
+  "isDesktopOnly": false
+}

@@ -258,16 +258,19 @@ const server = app.listen(config.port, async () => {
 
   await initPlugins({ app, config, wss, watcher });
 
-  // Auto-enable agent plugin for all vaults
+  // Auto-enable bundled plugins for all vaults.
+  // office-reader нужен там же, где агент: docx из чата открывается его view.
   const discovered = getDiscoveredPlugins();
 
-  if (discovered.find((p) => p.id === "agent")) {
+  for (const pluginId of ["agent", "office-reader"]) {
+    if (!discovered.find((p) => p.id === pluginId)) continue;
+
     for (const vaultId of Object.keys(config.vaults)) {
       try {
-        await enablePluginForVault("agent", vaultId);
+        await enablePluginForVault(pluginId, vaultId);
       } catch { /* already enabled */ }
     }
-    console.log("[ignis] Agent plugin auto-enabled for all vaults");
+    console.log(`[ignis] ${pluginId} plugin auto-enabled for all vaults`);
   }
 
   const bundledPluginDirs = getBundledPluginDirs();

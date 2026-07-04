@@ -1,0 +1,63 @@
+/* Office Reader: читабельный рендер DOCX внутри Obsidian.
+   Цвета — через CSS-переменные приложения, чтобы работали обе темы. */
+
+.office-docx-view {
+  overflow-y: auto;
+}
+
+.office-docx-status {
+  padding: 2em;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.office-docx-body {
+  /* как у заметок: ограниченная ширина строки читается легче */
+  max-width: 46em;
+  margin: 0 auto;
+  padding: 1.5em 2em 4em;
+  color: var(--text-normal);
+  font-size: var(--font-text-size, 16px);
+  line-height: 1.6;
+}
+
+.office-docx-body h1,
+.office-docx-body h2,
+.office-docx-body h3,
+.office-docx-body h4 {
+  color: var(--text-normal);
+  line-height: 1.3;
+}
+
+.office-docx-body p {
+  margin: 0.6em 0;
+}
+
+.office-docx-body table {
+  border-collapse: collapse;
+  margin: 1em 0;
+  max-width: 100%;
+}
+
+.office-docx-body th,
+.office-docx-body td {
+  border: 1px solid var(--background-modifier-border);
+  padding: 4px 8px;
+}
+
+.office-docx-body img {
+  max-width: 100%;
+  height: auto;
+}
+
+.office-docx-body a {
+  color: var(--text-accent);
+}
+
+/* Подсветка цитаты из чата агента */
+.office-docx-mark {
+  background-color: var(--text-highlight-bg, rgba(255, 208, 0, 0.4));
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 1px;
+}

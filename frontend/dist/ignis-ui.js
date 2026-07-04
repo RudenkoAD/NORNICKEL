@@ -20613,7 +20613,7 @@ var IgnisUI = (() => {
     });
     html = html.replace(/^---$/gm, "<hr>");
     html = html.replace(/^([*-]) (.+)$/gm, "<li>$2</li>");
-    html = html.replace(/^\d+\. (.+)$/gm, "<li>$2</li>");
+    html = html.replace(/^\d+\. (.+)$/gm, "<li>$1</li>");
     html = html.replace(/((?:<li>.*<\/li>\n?)+)/g, (block) => {
       const isOrdered = block.match(/^<li>(\d+)\./) !== null;
       return `
@@ -20652,31 +20652,11 @@ ${block.trim()}
   function renderResponse(response) {
     let html = "";
     html += `<div class="agent-block agent-block--answer">${parseMarkdown(response.answer)}</div>`;
-    if (response.entities && response.entities.length > 0) {
-      const items = response.entities.map(
-        (e) => `<span class="agent-entity agent-entity--${e.type}">${escapeHtml(e.name)}</span>`
-      ).join("");
-      html += `<div class="agent-block agent-block--entities">
-      <div class="agent-block-label">\u0421\u0443\u0449\u043D\u043E\u0441\u0442\u0438 (${response.entities.length})</div>
-      <div class="agent-entity-list">${items}</div>
-    </div>`;
-    }
-    if (response.relations && response.relations.length > 0) {
-      const items = response.relations.map(
-        (r) => `<div class="agent-relation">${escapeHtml(r.from)} <span class="agent-relation-type">${escapeHtml(r.type)}</span> ${escapeHtml(r.to)}</div>`
-      ).join("");
-      html += `<div class="agent-block agent-block--relations">
-      <div class="agent-block-label">\u0421\u0432\u044F\u0437\u0438 (${response.relations.length})</div>
-      <div class="agent-relation-list">${items}</div>
-    </div>`;
-    }
     if (response.sources && response.sources.length > 0) {
       const items = response.sources.map((s) => {
         const link = resolveSourceLink(s);
-        const excerpt = escapeHtml(s.excerpt);
         return `<div class="agent-source">
           <div class="agent-source-link">${link}</div>
-          <div class="agent-source-excerpt">${excerpt}</div>
         </div>`;
       }).join("");
       html += `<div class="agent-block agent-block--sources">
@@ -20709,71 +20689,39 @@ ${block.trim()}
     Facility: "equipment",
     Document: "topic"
   };
-  function renderFromBackend(answerText, subgraph, citations) {
+  function renderFromBackend(answerText, subgraph, citations, backendSources) {
     let html = "";
     if (answerText) {
       html += `<div class="agent-block agent-block--answer">${parseMarkdown(answerText)}</div>`;
     }
     const nodes = (subgraph == null ? void 0 : subgraph.nodes) || [];
     const edges = (subgraph == null ? void 0 : subgraph.edges) || [];
-    const entityNodes = nodes.filter(
-      (n) => n.label !== "Document" && n.label !== "Chunk"
-    );
-    if (entityNodes.length > 0) {
-      const items = entityNodes.map((n) => {
-        const type = LABEL_TO_TYPE[n.label] || "topic";
-        return `<span class="agent-entity agent-entity--${type}">${escapeHtml(n.name || n.key)}</span>`;
-      }).join("");
-      html += `<div class="agent-block agent-block--entities">
-      <div class="agent-block-label">\u0421\u0443\u0449\u043D\u043E\u0441\u0442\u0438 (${entityNodes.length})</div>
-      <div class="agent-entity-list">${items}</div>
-    </div>`;
-    }
-    if (edges.length > 0) {
-      const items = edges.map((e) => {
-        const fromName = escapeHtml(e.from);
-        const toName = escapeHtml(e.to);
-        return `<div class="agent-relation">${fromName} <span class="agent-relation-type">${escapeHtml(e.type)}</span> ${toName}</div>`;
-      }).join("");
-      html += `<div class="agent-block agent-block--relations">
-      <div class="agent-block-label">\u0421\u0432\u044F\u0437\u0438 (${edges.length})</div>
-      <div class="agent-relation-list">${items}</div>
-    </div>`;
-    }
-    const sourceMap = /* @__PURE__ */ new Map();
-    for (const e of edges) {
-      const p = e.props || {};
-      if (p.source_doc_id && !sourceMap.has(p.source_doc_id)) {
-        sourceMap.set(p.source_doc_id, {
-          doc_id: p.source_doc_id,
-          path: p.document_path || "",
-          excerpt: p.quote || "",
-          quote: p.quote || "",
-          title: p.document_title || p.source_doc_id
-        });
-      }
-    }
-    if (citations && citations.length > 0) {
-      for (const cite of citations) {
-        if (!sourceMap.has(cite)) {
-          sourceMap.set(cite, {
-            doc_id: cite,
-            path: "",
-            excerpt: "",
-            quote: "",
-            title: cite
+    let sources = [];
+    if (backendSources && backendSources.length > 0) {
+      sources = backendSources.map((s) => ({
+        doc_id: s.doc_id, path: s.path || "", quote: s.quote || "",
+        title: s.title || s.doc_id
+      }));
+    } else {
+      const sourceMap = /* @__PURE__ */ new Map();
+      for (const e of edges) {
+        const p = e.props || {};
+        if (p.source_doc_id && !sourceMap.has(p.source_doc_id)) {
+          sourceMap.set(p.source_doc_id, {
+            doc_id: p.source_doc_id,
+            path: p.document_path || "",
+            quote: p.quote || "",
+            title: p.document_title || p.source_doc_id
           });
         }
       }
+      sources = Array.from(sourceMap.values());
     }
-    const sources = Array.from(sourceMap.values());
     if (sources.length > 0) {
       const items = sources.map((s) => {
         const link = resolveSourceLink(s);
-        const excerpt = escapeHtml(s.excerpt || "");
         return `<div class="agent-source">
           <div class="agent-source-link">${link}</div>
-          ${excerpt ? `<div class="agent-source-excerpt">${excerpt}</div>` : ""}
         </div>`;
       }).join("");
       html += `<div class="agent-block agent-block--sources">
@@ -21632,6 +21580,7 @@ ${block.trim()}
     };
   }
   var API = "/api/ext/agent";
+
   var PLACEHOLDER = "Ask a question about materials, experiments, properties...";
   function formatDate(iso) {
     if (!iso)
@@ -21758,11 +21707,45 @@ ${block.trim()}
     }
     function openLink(path, quote) {
       var _a, _b, _c, _d;
-      if (linkHandler) {
-        linkHandler(path, quote || null);
-      } else if ((_d = (_c = (_b = (_a = window.__ignis) == null ? void 0 : _a.obsidian) == null ? void 0 : _b.app) == null ? void 0 : _c.workspace) == null ? void 0 : _d.openLinkText) {
-        window.__ignis.obsidian.app.workspace.openLinkText(path, quote || "", false);
+      const lower = (path || "").toLowerCase();
+      const dot = lower.lastIndexOf(".");
+      const ext = dot === -1 ? "" : lower.slice(dot + 1);
+      // Файлы-источники лежат в вольте Corpus; статика сервера — честный фолбэк
+      const corpusUrl = "/vault-files/Corpus/" + path.split("/").map(encodeURIComponent).join("/");
+      if (ext === "md" || ext === "") {
+        // Старый путь: linkHandler агент-плагина открывает заметку и подсвечивает цитату
+        if (linkHandler) {
+          linkHandler(path, quote || null);
+        } else if ((_d = (_c = (_b = (_a = window.__ignis) == null ? void 0 : _a.obsidian) == null ? void 0 : _b.app) == null ? void 0 : _c.workspace) == null ? void 0 : _d.openLinkText) {
+          window.__ignis.obsidian.app.workspace.openLinkText(path, quote || "", false);
+        }
+        return;
       }
+      if (ext === "pdf" || ext === "docx") {
+        // PDF/DOCX открываем внутри Obsidian, но только когда текущий вольт — Corpus:
+        // кросс-вольт в Ignis невозможен без перезагрузки страницы (vaultService.openVault
+        // делает location.href), а перезагрузка убила бы открытый чат.
+        // Не используем openLinkText: на нерезолвящейся ссылке он создаёт новую .md-заметку.
+        const app2 = window.app;
+        let file = null;
+        if ((window.__currentVaultId || "") === "Corpus" && (app2 == null ? void 0 : app2.vault)) {
+          file = app2.vault.getFileByPath ? app2.vault.getFileByPath(path) : app2.vault.getAbstractFileByPath(path);
+        }
+        // Для docx нужен view плагина office-reader; без него openFile покажет
+        // «unsupported extension» — тогда честнее открыть новой вкладкой.
+        const viewOk = ext === "pdf" || !!((_b = (_a = app2 == null ? void 0 : app2.viewRegistry) == null ? void 0 : _a.getTypeByExtension) == null ? void 0 : _b.call(app2.viewRegistry, "docx"));
+        if (file && file.extension && viewOk) {
+          if (ext === "docx") {
+            // Цитата для office-reader: одноразовый глобал, view заберёт его после рендера
+            window.__officeQuote = quote || null;
+          }
+          app2.workspace.getLeaf(false).openFile(file);
+          return;
+        }
+      }
+      // pptx, xlsx и прочее (плюс фолбэк для pdf/docx) — новой вкладкой:
+      // браузер сам покажет pdf или скачает файл
+      window.open(corpusUrl, "_blank");
     }
     function handleLinkClick(e) {
       const target = e.target;
@@ -21866,6 +21849,7 @@ Current: ${query}` : query;
       let fullAnswer = "";
       let pendingChars = "";
       let citations = [];
+      let backendSources = [];
       let subgraph = { nodes: [], edges: [] };
       let hasError = false;
       let streaming = true;
@@ -21926,6 +21910,9 @@ Current: ${query}` : query;
                 case "subgraph":
                   subgraph = payload && payload.nodes ? payload : { nodes: [], edges: [] };
                   break;
+                case "sources":
+                  backendSources = Array.isArray(payload) ? payload : [];
+                  break;
                 case "error":
                   hasError = true;
                   streaming = false;
@@ -21942,7 +21929,7 @@ Current: ${query}` : query;
         await new Promise((r) => setTimeout(r, 30));
       }
       if (!hasError) {
-        const html = renderFromBackend(fullAnswer, subgraph, citations);
+        const html = renderFromBackend(fullAnswer, subgraph, citations, backendSources);
         $$invalidate(1, messages = [...before, { role: "agent", content: fullAnswer, html }]);
       }
     }
