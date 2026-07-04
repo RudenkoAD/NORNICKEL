@@ -213,6 +213,15 @@ RETURN node.chunk_id AS chunk_id, node.doc_id AS doc_id, node.idx AS idx, score
 ORDER BY score DESC
 """.strip()
 
+# BM25 по ПОЛНОМУ тексту чанков (04.07, гибрид): у bridge-документов чанк = весь
+# журнал, а эмбеддится только голова (EMB_MAX_CHARS) — термины в глубине документа
+# невидимы векторам; Lucene индексирует текст целиком.
+CHUNK_FULLTEXT_SEARCH = f"""
+CALL db.index.fulltext.queryNodes('chunk_fulltext', $q) YIELD node, score
+RETURN node.chunk_id AS chunk_id, node.doc_id AS doc_id, score
+ORDER BY score DESC LIMIT $k
+""".strip()
+
 DOC_VECTOR_SEARCH = f"""
 CALL db.index.vector.queryNodes('{VectorIndex.DOCUMENT}', $k, $query_vector) YIELD node, score
 RETURN node.doc_id AS doc_id, score

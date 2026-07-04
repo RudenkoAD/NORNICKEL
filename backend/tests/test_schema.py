@@ -19,12 +19,13 @@ def test_schema_has_no_placeholder_after_substitution() -> None:
 
 def test_schema_splits_into_expected_statements() -> None:
     stmts = load_statements(SCHEMA_PATH.read_text(encoding="utf-8"), emb_dim=256)
-    # 10 constraint + 4 range + 6 provenance + 6 node + 1 fulltext + 3 vector = 30.
-    assert len(stmts) == 30, f"ожидалось 30 statements, получено {len(stmts)}"
+    # 10 constraint + 4 range + 6 provenance + 6 node + 2 fulltext + 3 vector = 31
+    # (04.07: + chunk_fulltext — BM25 по полному тексту чанков для гибридного поиска).
+    assert len(stmts) == 31, f"ожидалось 31 statement, получено {len(stmts)}"
     assert all(not s.lstrip().startswith("//") for s in stmts), "комментарии не вырезаны"
     assert sum(s.startswith("CREATE CONSTRAINT") for s in stmts) == 10
     assert sum(s.startswith("CREATE VECTOR INDEX") for s in stmts) == 3
-    assert sum(s.startswith("CREATE FULLTEXT INDEX") for s in stmts) == 1
+    assert sum(s.startswith("CREATE FULLTEXT INDEX") for s in stmts) == 2
 
 
 def test_strict_filters_interval_predicate_and_needs_review() -> None:

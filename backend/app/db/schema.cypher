@@ -45,6 +45,11 @@ CREATE FULLTEXT INDEX entity_names IF NOT EXISTS
 FOR (n:Material|Process|Equipment|Parameter|Expert)
 ON EACH [n.name_ru, n.name_en, n.aliases_text, n.name];
 
+// BM25 по полному тексту чанков (04.07, гибридный поиск): вектора видят только
+// голову чанка (EMB_MAX_CHARS), Lucene — текст целиком.
+CREATE FULLTEXT INDEX chunk_fulltext IF NOT EXISTS
+FOR (c:Chunk) ON EACH [c.text];
+
 // --- Векторные индексы (__EMB_DIM__ заменяет init_db.py текстовой подстановкой) ---
 CREATE VECTOR INDEX chunk_emb IF NOT EXISTS FOR (c:Chunk) ON (c.embedding)
 OPTIONS {indexConfig: {`vector.dimensions`: __EMB_DIM__, `vector.similarity_function`: 'cosine'}};

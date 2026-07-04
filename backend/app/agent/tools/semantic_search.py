@@ -13,6 +13,8 @@ best_chunks[],score,cite_key}] в порядке убывания score (§5.2).
 
 from __future__ import annotations
 
+import re
+
 import logging
 from typing import Any, Optional
 
@@ -21,6 +23,7 @@ from app.config import PARTNER_ROLE
 from app.db.constants import ACCESS_PUBLIC
 from app.db.neo4j_client import Neo4jClient, get_client
 from app.db.queries import (
+    CHUNK_FULLTEXT_SEARCH,
     CHUNK_VECTOR_SEARCH,
     CHUNKS_TEXT,
     DOC_ACCESS_MAP,
@@ -145,6 +148,49 @@ async def run(
             if chunk_id:
                 doc_best_chunks[doc_id].append((score, chunk_id))
 
+    # (2б) BM25-добор по ПОЛНОМУ тексту чанков (04.07, кейс №1 «обессоливание»):
+    # у bridge-документов чанк = весь журнал, а эмбеддится только голова
+    # (EMB_MAX_CHARS=5000) — 13 из 14 профильных источников были невидимы векторам
+    # (термины на позициях 7К-120К). Lucene индексирует текст целиком. Слияние —
+    # RRF по рангам: шкалы косинуса и BM25 несравнимы напрямую.
+    ft_query = _lucene_query(query_text_ru, query_text_en)
+    ft_rank: dict[str, int] = {}
+    if ft_query:
+        try:
+            ft_rows = db.read(CHUNK_FULLTEXT_SEARCH, {"q": ft_query, "k": k})
+        except Exception as err:  # noqa: BLE001 — нет индекса → чисто векторный режим
+            log.warning("BM25-добор недоступен: %s", err)
+            ft_rows = []
+        for rank, r in enumerate(ft_rows):
+            doc_id, chunk_id = r.get("doc_id"), r.get("chunk_id")
+            if not doc_id or doc_id in ft_rank:
+                continue
+            if allowed_docs is not None and doc_id not in allowed_docs:
+                continue
+            ft_rank[doc_id] = rank
+            doc_best_chunks.setdefault(doc_id, [])
+            if chunk_id:
+                # BM25-чанк несёт искомые термины — важен для контекста синтеза.
+                doc_best_chunks[doc_id].append((0.60, chunk_id))
+            best_score.setdefault(doc_id, 0.0)
+
+    if ft_rank:
+        # RRF (k=60): вектора и BM25 голосуют рангами; документ в обоих списках
+        # поднимается. best_score дальше используется и для сортировки, и как
+        # видимый score документа.
+        vec_rank = {d: i for i, d in enumerate(
+            sorted((d for d, s in best_score.items() if s > 0.0),
+                   key=lambda d: best_score[d], reverse=True))}
+        fused: dict[str, float] = {}
+        for d in best_score:
+            f = 0.0
+            if d in vec_rank:
+                f += 1.0 / (60 + vec_rank[d])
+            if d in ft_rank:
+                f += 1.0 / (60 + ft_rank[d])
+            fused[d] = f
+        best_score = fused
+
     if not best_score:
         return []
 
@@ -213,3 +259,24 @@ async def run(
             }
         )
     return results
+
+
+_LUCENE_ESCAPE_RE = re.compile(r'([+\-&|!(){}\[\]^"~*?:\\/])')
+_STOP_TOKENS = frozenset({
+    "какие", "какой", "каковы", "для", "при", "или", "методы", "способы", "решения",
+    "описаны", "применялись", "считается", "подходят", "если", "воды", "and", "the",
+    "for", "with", "what", "which", "methods",
+})
+
+
+def _lucene_query(*texts: str) -> str:
+    """OR-запрос из значимых токенов ru/en текстов запроса (≤16 токенов)."""
+    toks: list[str] = []
+    for text in texts:
+        for tok in re.findall(r"[0-9A-Za-zА-Яа-яЁё]{4,}", text or ""):
+            low = tok.lower()
+            if low in _STOP_TOKENS or low in toks:
+                continue
+            toks.append(low)
+    toks = toks[:16]
+    return " OR ".join(_LUCENE_ESCAPE_RE.sub(r"\\\1", t) for t in toks)
