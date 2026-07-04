@@ -57,6 +57,7 @@ services:
       - backend
     env_file: .env
     environment:
+      CORPUS_VAULT_PATH: "/app/vaults/Corpus"
       AGENT_API_URL: "http://backend:8000/query"
       VAULT_ROOT: "/app/vaults"
       OBSIDIAN_ASSETS_PATH: "/app/obsidian-assets"
@@ -64,7 +65,7 @@ services:
     volumes:
       - frontend_vaults:/app/vaults
       - frontend_data:/app/data
-      - ./corpus:/app/vaults/My Vault/corpus:ro
+      - ./corpus:/app/vaults/Corpus:ro
     ports:
       - "80:80"
 

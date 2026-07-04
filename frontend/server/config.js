@@ -58,6 +58,16 @@ function discoverVaults() {
 
 let vaults = discoverVaults();
 
+// Always include the corpus as a vault if CORPUS_VAULT_PATH is set
+const corpusPath = process.env.CORPUS_VAULT_PATH;
+if (corpusPath) {
+  try {
+    if (fs.existsSync(corpusPath) && fs.statSync(corpusPath).isDirectory()) {
+      vaults["Corpus"] = corpusPath;
+    }
+  } catch { /* ignore invalid path */ }
+}
+
 module.exports = {
   port: process.env.PORT || 80,
   vaultRoot,
@@ -73,6 +83,10 @@ module.exports = {
   },
   refreshVaults() {
     vaults = discoverVaults();
+    // Re-apply CORPUS_VAULT_PATH on every refresh
+    if (corpusPath && fs.existsSync(corpusPath) && fs.statSync(corpusPath).isDirectory()) {
+      vaults["Corpus"] = corpusPath;
+    }
     return vaults;
   },
 
