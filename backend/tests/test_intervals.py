@@ -182,11 +182,13 @@ def test_unknown_unit_needs_review_not_raise(registry: UnitRegistry) -> None:
     assert "фунтов/дюйм" in (iv.review_reason or "")
 
 
-def test_currency_unit_needs_review(registry: UnitRegistry) -> None:
-    """$/т распознаётся, но не конвертируется (курс) → needs_review, значение как есть."""
+def test_currency_unit_needs_review(registry) -> None:
+    """04.07: $/т — своя категория economic_usd, конвертация внутри валюты БЕЗ флага
+    (раньше был multiplier:null → needs_review; тест обновлён под новую семантику)."""
     iv = registry.parse_numeric("15000", "$/т", "=")
-    assert iv.needs_review is True
-    assert iv.value_min == pytest.approx(15000.0)
+    assert iv.needs_review is False
+    assert iv.unit_canon == "$/т"
+    assert iv.value_min == iv.value_max == 15000.0
 
 
 # --- Десятичные разделители и пробелы-разряды ---
