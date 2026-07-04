@@ -490,10 +490,29 @@ def build_find_gaps(
     }
     access = _partner_access_predicate(role, "d")
 
-    lines = [
-        f"MATCH (m:{Node.MATERIAL}) WHERE ($materials IS NULL OR m.canonical_id IN $materials)",
-        f"MATCH (p:{Node.PROCESS}) WHERE ($processes IS NULL OR p.canonical_id IN $processes)",
-    ]
+    # 04.07: открытая ось = топ-40 по связности, а не все узлы метки. После
+    # Haiku-корпуса полное произведение (3000+ материалов × 2600+ процессов) —
+    # ~8 млн комбинаций: MemoryPoolOutOfMemory на /gaps без фильтров и 20-50 с
+    # top_gaps дашборда; пробел среди несвязных хвостов и не интерпретируем.
+    lines = []
+    if materials is None:
+        lines.append(
+            "CALL { "
+            f"MATCH (m0:{Node.MATERIAL}) "
+            f"OPTIONAL MATCH (m0)-[:{Rel.MENTIONED_IN}]->(:{Node.DOCUMENT}) "
+            "WITH m0, count(*) AS _md ORDER BY _md DESC LIMIT 40 RETURN m0 AS m }"
+        )
+    else:
+        lines.append(f"MATCH (m:{Node.MATERIAL}) WHERE m.canonical_id IN $materials")
+    if processes is None:
+        lines.append(
+            "CALL { "
+            f"MATCH (p0:{Node.PROCESS}) "
+            f"OPTIONAL MATCH (p0)-[:{Rel.MENTIONED_IN}]->(:{Node.DOCUMENT}) "
+            "WITH p0, count(*) AS _pd ORDER BY _pd DESC LIMIT 40 RETURN p0 AS p }"
+        )
+    else:
+        lines.append(f"MATCH (p:{Node.PROCESS}) WHERE p.canonical_id IN $processes")
 
     # Предикаты на документ комбинации: RBAC-доступ + (опц.) наличие env-условия.
     doc_predicates: list[str] = []

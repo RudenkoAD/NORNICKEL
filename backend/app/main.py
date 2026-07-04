@@ -440,6 +440,10 @@ def get_subgraph(
     (устойчиво к обрезке limit:300).
     """
     request.state.audit_subject = {"node_key": node_key, "depth": depth}
+    # Форма «Label:ключ» (Process:desalination) — срезаем префикс метки: ключи
+    # уникальны глобально (§3.4), а молчаливо пустой подграф хуже толерантности.
+    if ":" in node_key and node_key.split(":", 1)[0] in q.KEY_PROPERTY:
+        node_key = node_key.split(":", 1)[1]
     client = db()
     params = {
         "node_key": node_key,
