@@ -48,18 +48,28 @@ services:
     ports:
       - "8000:8000"                        # Swagger /docs + API для жюри и фронта
 
-  # --- frontend (§8, §11): Streamlit — тонкий клиент над REST API. ---
-  # frontend:
-  #   build: ./frontend
-  #   container_name: nornickel-frontend
-  #   restart: unless-stopped
-  #   depends_on:
-  #     - backend
-  #   environment:
-  #     BACKEND_URL: "http://backend:8000"
-  #   ports:
-  #     - "80:80"
+  # --- frontend: Ignis-based Obsidian client для чата с агентом и просмотра файлов. ---
+  frontend:
+    build: ./frontend
+    container_name: nornickel-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    env_file: .env
+    environment:
+      AGENT_API_URL: "http://backend:8000/query"
+      VAULT_ROOT: "/app/vaults"
+      OBSIDIAN_ASSETS_PATH: "/app/obsidian-assets"
+      DATA_ROOT: "/app/data"
+    volumes:
+      - frontend_vaults:/app/vaults
+      - frontend_data:/app/data
+      - ./corpus:/app/vaults/My Vault/corpus:ro
+    ports:
+      - "80:80"
 
 volumes:
   neo4j_data:
   neo4j_logs:
+  frontend_vaults:
+  frontend_data:

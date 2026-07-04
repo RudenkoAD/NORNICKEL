@@ -1,0 +1,9 @@
+{
+  "id": "ignis-agent",
+  "name": "Knowledge Graph Agent",
+  "version": "0.1.0",
+  "minAppVersion": "1.12.4",
+  "description": "Chat-based AI agent for querying scientific knowledge graph — Ignis edition",
+  "author": "Ignis",
+  "isDesktopOnly": false
+}

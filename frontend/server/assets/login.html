@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ignis - Login</title>
+  <link rel="icon" type="image/png" href="favicon.png" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #1e1e1e;
+      color: #d4d4d4;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    .login-container {
+      background: #2d2d2d;
+      border: 1px solid #3e3e3e;
+      border-radius: 12px;
+      padding: 40px;
+      width: 100%;
+      max-width: 400px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    }
+    .login-header {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+    .login-header h1 {
+      font-size: 24px;
+      font-weight: 600;
+      color: #e0e0e0;
+      margin-bottom: 8px;
+    }
+    .login-header p {
+      font-size: 14px;
+      color: #888;
+    }
+    .form-group {
+      margin-bottom: 20px;
+    }
+    .form-group label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      color: #aaa;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .form-group input {
+      width: 100%;
+      padding: 10px 14px;
+      background: #1e1e1e;
+      border: 1px solid #3e3e3e;
+      border-radius: 8px;
+      color: #e0e0e0;
+      font-size: 14px;
+      transition: border-color 0.2s;
+      outline: none;
+    }
+    .form-group input:focus {
+      border-color: #7c3aed;
+      box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.2);
+    }
+    .btn {
+      width: 100%;
+      padding: 12px;
+      background: #7c3aed;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn:hover { background: #6d28d9; }
+    .btn:disabled { background: #4a4a4a; cursor: not-allowed; }
+    .error {
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: #f87171;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      margin-bottom: 20px;
+      display: none;
+    }
+    .error.visible { display: block; }
+    .setup-note {
+      text-align: center;
+      margin-top: 16px;
+      font-size: 13px;
+      color: #888;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-container">
+    <div class="login-header">
+      <h1 id="heading">Ignis</h1>
+      <p id="subheading">Sign in to your vaults</p>
+    </div>
+    <div class="error" id="error"></div>
+    <form id="loginForm">
+      <div class="form-group">
+        <label for="username">Username</label>
+        <input type="text" id="username" name="username" autocomplete="username" required minlength="3" />
+      </div>
+      <div class="form-group" id="confirmGroup" style="display:none">
+        <label for="confirmPassword">Confirm Password</label>
+        <input type="password" id="confirmPassword" name="confirmPassword" autocomplete="new-password" />
+      </div>
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" autocomplete="current-password" required minlength="6" />
+      </div>
+      <button type="submit" class="btn" id="submitBtn">Sign In</button>
+    </form>
+    <div class="setup-note" id="setupNote" style="display:none">
+      First time? An admin account will be created.
+    </div>
+  </div>
+
+  <script>
+    var isSetup = false;
+    var errorEl = document.getElementById("error");
+    var headingEl = document.getElementById("heading");
+    var subheadingEl = document.getElementById("subheading");
+    var submitBtn = document.getElementById("submitBtn");
+    var confirmGroup = document.getElementById("confirmGroup");
+    var confirmInput = document.getElementById("confirmPassword");
+    var setupNote = document.getElementById("setupNote");
+    var loginForm = document.getElementById("loginForm");
+
+    function showError(msg) {
+      errorEl.textContent = msg;
+      errorEl.classList.add("visible");
+    }
+
+    function hideError() {
+      errorEl.classList.remove("visible");
+    }
+
+    function setButtonLoading(loading) {
+      submitBtn.disabled = loading;
+      if (isSetup) {
+        submitBtn.textContent = loading ? "Creating..." : "Create Account";
+      } else {
+        submitBtn.textContent = loading ? "Signing in..." : "Sign In";
+      }
+    }
+
+    fetch("/api/auth/status")
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.needsSetup) {
+          isSetup = true;
+          headingEl.textContent = "Welcome to Ignis";
+          subheadingEl.textContent = "Create your admin account";
+          submitBtn.textContent = "Create Account";
+          confirmGroup.style.display = "block";
+          confirmInput.required = true;
+          setupNote.style.display = "block";
+        }
+      })
+      .catch(function() {});
+
+    loginForm.addEventListener("submit", function(e) {
+      e.preventDefault();
+      hideError();
+
+      var username = document.getElementById("username").value.trim();
+      var password = document.getElementById("password").value;
+
+      if (!username || !password) {
+        showError("Please fill in all fields");
+        return;
+      }
+
+      if (isSetup) {
+        var confirmPassword = confirmInput.value;
+        if (password !== confirmPassword) {
+          showError("Passwords do not match");
+          return;
+        }
+      }
+
+      setButtonLoading(true);
+
+      var endpoint = isSetup ? "/api/auth/setup" : "/api/auth/login";
+
+      fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: username, password: password }),
+      })
+        .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
+        .then(function(result) {
+          if (!result.ok) {
+            showError(result.data.error || "Authentication failed");
+            setButtonLoading(false);
+            return;
+          }
+
+          document.cookie = "token=" + result.data.token + ";path=/;max-age=604800;SameSite=Lax";
+          window.location.href = "/";
+        })
+        .catch(function(err) {
+          showError("Network error. Please try again.");
+          setButtonLoading(false);
+        });
+    });
+  </script>
+</body>
+</html>
