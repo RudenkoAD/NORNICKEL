@@ -180,17 +180,27 @@ def _node_keys_from_plan(plan: dict[str, Any], docs: list[dict[str, Any]]) -> li
     return keys
 
 
-def _build_sources(graph: dict[str, Any], docs: Optional[list[dict]] = None,
+# [cite_key] в тексте ответа — синтез ставит ссылки в квадратных скобках (§5.3).
+_CITE_RE = re.compile(r"\[([^\]]+)\]")
+
+
+def _build_sources(graph: dict[str, Any], cite_map: dict[str, str],
                    answer_md: str = "") -> list[dict[str, Any]]:
-    """Источники-файлы для UI (04.07): уникальные документы провенанса подграфа.
+    """Источники-файлы для UI (04.07): документы, РЕАЛЬНО процитированные в ответе.
 
     Каждый — {doc_id, title, path (corpus-относительный, открывается в vault
-    «Corpus»), quote (первая цитата — плагин прокручивает к ней с подсветкой)}.
-    Подграф уже пост-фильтрован по роли (§7) — непубличного здесь нет.
+    «Corpus»), quote (первая цитата — плагин прокручивает к ней с подсветкой),
+    cite_key}. cite_map (точный cite_key→doc_id из graph_search + семантики) уже
+    RBAC-фильтрован на источниках — непубличного здесь нет.
+
+    Порядок (04.07, вердикт кейса №4: ранжирование по кандидатам подграфа теряло
+    документы, процитированные из клеймов, и тянуло мусор из окрестностей):
+    1) процитированные в тексте ([cite_key] через cite_map) — в порядке первого
+       появления, БЕЗ обрезки (если их больше 8 — отдаём все);
+    2) добор до 8 — факт-документы подграфа с цитатой, без дублей.
     """
-    # Только документы, из которых взяты ФАКТЫ ответа (клеймы/условия/продукты) —
-    # сбор со всех рёбер тянул MENTIONED_IN-окрестности подграфа: 20 файлов мусора
-    # вместо ~6 профильных (04.07, регресс после перехода на событие sources).
+    # Цитаты факт-рёбер (клеймы/условия/продукты): quote для карточки источника.
+    # Сбор со ВСЕХ рёбер тянул MENTIONED_IN-окрестности — 20 файлов мусора (04.07).
     _FACT_TYPES = {"HAS_CONDITION", "PRODUCES", "USES_MATERIAL", "USED_EQUIPMENT",
                    "STUDIES", "EXPERT_IN", "CONTRADICTS", "SUPPORTED_BY"}
     fact_quotes: dict[str, str] = {}
@@ -201,49 +211,54 @@ def _build_sources(graph: dict[str, Any], docs: Optional[list[dict]] = None,
         did = p.get("source_doc_id")
         if did and str(did) not in fact_quotes:
             fact_quotes[str(did)] = str(p.get("quote") or "")
-    # Порядок кандидатов: СНАЧАЛА топ семантики (их цитирует синтез — факт-рёбер
-    # в большом подграфе бывает >30 и они выталкивали семантику за кап, 04.07),
-    # затем документы фактов; цитата подтягивается из факт-ребра того же дока.
-    per_doc: dict[str, str] = {}
-    for d in (docs or [])[:10]:
-        did = str(d.get("doc_id") or "")
-        if did:
-            per_doc[did] = fact_quotes.get(did, "")
+    # (а) Процитированные doc_id в порядке ПЕРВОГО появления [cite_key] в тексте.
+    # Синтез иногда группирует ссылки «[A 2020; B 2021]» — раскрываем по «;».
+    cited_ids: list[str] = []
+    for raw in _CITE_RE.findall(answer_md or ""):
+        parts = [raw] if raw in cite_map else [p.strip() for p in raw.split(";")]
+        for ck in parts:
+            did = cite_map.get(ck)
+            if did and str(did) not in cited_ids:
+                cited_ids.append(str(did))
+    # (б)+(в) Кандидаты: цитированные первыми, добор до 8 факт-документами;
+    # (г) цитированных не режем — кап растягивается под них.
+    cap = max(8, len(cited_ids))
+    per_doc: dict[str, str] = {did: fact_quotes.get(did, "") for did in cited_ids}
     for did, q in fact_quotes.items():
-        if did not in per_doc:
-            per_doc[did] = q
+        if len(per_doc) >= cap:
+            break
+        per_doc.setdefault(did, q)
     if not per_doc:
         return []
-    per_doc = dict(list(per_doc.items())[:30])
     try:
         from app.db.neo4j_client import get_client
         rows = get_client().read(
             "MATCH (d:Document) WHERE d.doc_id IN $ids "
             "RETURN d.doc_id AS doc_id, d.title AS title, d.source_path AS sp, "
             "d.authors AS authors, d.year AS year",
-            {"ids": list(per_doc)[:30]})
+            {"ids": list(per_doc)})
     except Exception as err:  # noqa: BLE001 — источники не валят ответ
         log.warning("_build_sources: %s", err)
         return []
-    # «Источники» = в первую очередь то, что РЕАЛЬНО процитировано в ответе
-    # ([cite_key] в тексте) — как видел пользователь до перехода на событие;
-    # добор — факт-документы с цитатой, суммарно ≤8.
     from app.agent.tools.graph_search import _cite_key
-    out = []
-    for r in rows:
+    meta: dict[str, dict[str, Any]] = {str(r["doc_id"]): r for r in rows}
+
+    def _item(did: str) -> Optional[dict[str, Any]]:
+        r = meta.get(did)
+        if not r:
+            return None  # документ потерян/удалён — молча пропускаем
         sp = (r.get("sp") or "").replace("\\", "/")
         path = sp.split("/corpus/", 1)[1] if "/corpus/" in sp else ""
-        ck = _cite_key(r.get("authors"), r.get("year"))
-        used = bool(answer_md) and f"[{ck}]" in answer_md
-        out.append({"doc_id": r["doc_id"], "title": r.get("title") or r["doc_id"],
-                    "path": path, "quote": per_doc.get(str(r["doc_id"]), ""),
-                    "cite_key": ck, "used": used})
-    out.sort(key=lambda s: (not s["used"], s["quote"] == "", str(s["title"])))
-    n_used = sum(1 for s in out if s["used"])
-    keep = out[: max(n_used, 8)] if n_used else out[:8]
-    for s in keep:
-        s.pop("used", None)
-    return keep
+        return {"doc_id": r["doc_id"], "title": r.get("title") or r["doc_id"],
+                "path": path, "quote": per_doc.get(did, ""),
+                "cite_key": _cite_key(r.get("authors"), r.get("year"))}
+
+    cited_out = [it for did in cited_ids if (it := _item(did))]
+    fill_out = [it for did in per_doc if did not in cited_ids and (it := _item(did))]
+    # Добор — с цитатой вперёд, дальше по названию; цитированные не сортируем
+    # (их порядок = порядок появления в тексте ответа).
+    fill_out.sort(key=lambda s: (s["quote"] == "", str(s["title"])))
+    return cited_out + fill_out
 
 
 def _merge_citations(docs: list[dict[str, Any]], graph: dict[str, Any]) -> list[str]:
@@ -686,8 +701,17 @@ async def answer_stream(question: str, role: str) -> AsyncIterator[dict]:
         yield {"event": "subgraph", "data": subgraph}
         # 04.07 (запрос фронта): источники-ФАЙЛЫ с цитатой для открытия на месте —
         # собираются здесь (единый источник правды), UI их чисто рендерит без
-        # пост-запросов из браузера. RBAC уже применён: подграф отфильтрован по роли.
-        yield {"event": "sources", "data": _build_sources(graph, docs, "".join(answer_parts))}
+        # пост-запросов из браузера. RBAC уже применён: cite_map графа фильтрован
+        # в _CITE_KEY_QUERY, семантика — в semantic_search (§7).
+        # Точный маппинг cite_key→doc_id: граф (SUPPORTED_BY) + семантика ПОВЕРХ
+        # (у неё маппинг прямой из метаданных документа — свежее при коллизии ключей).
+        cite_map: dict[str, str] = {
+            **graph.get("cite_map", {}),
+            **{d["cite_key"]: d["doc_id"] for d in docs + branch_docs
+               if d.get("cite_key") and d.get("doc_id")},
+        }
+        yield {"event": "sources",
+               "data": _build_sources(graph, cite_map, "".join(answer_parts))}
 
         query_id = _cache_result(question, "".join(answer_parts), citations, subgraph)
         yield {"event": "done", "data": {"query_id": query_id}}

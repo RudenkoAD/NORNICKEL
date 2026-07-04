@@ -51,7 +51,8 @@ OPTIONAL MATCH (c)-[sb:{Rel.SUPPORTED_BY}]->(d:{Node.DOCUMENT})
 WHERE sb.deleted IS NULL
   AND (NOT $is_partner OR (d.access_level = 'public'
        AND NOT d.doc_id IN $nonpublic_doc_ids))
-RETURN c.claim_id AS claim_id, collect(DISTINCT {{authors: d.authors, year: d.year}}) AS docs
+RETURN c.claim_id AS claim_id,
+       collect(DISTINCT {{authors: d.authors, year: d.year, doc_id: d.doc_id}}) AS docs
 """.strip()
 
 
@@ -103,8 +104,16 @@ def _hub_neighbour_eids(db: Neo4jClient, hub_eids: list[str]) -> list[str]:
 
 
 def _claim_stats(db: Neo4jClient, serialized: dict[str, Any], role: str = "",
-                 nonpublic_doc_ids: Optional[set[str]] = None) -> list[dict[str, Any]]:
+                 nonpublic_doc_ids: Optional[set[str]] = None,
+                 ) -> tuple[list[dict[str, Any]], dict[str, str]]:
     """Статистика по Claim'ам подграфа (§5.2): SUPPORTED_BY, CONTRADICTS, cite_key.
+
+    Возвращает (stats, cite_map), где cite_map — точный маппинг cite_key→doc_id
+    поддерживающих документов (04.07, кейс №4: _build_sources оркестратора резолвит
+    по нему [cite_key] из текста ответа в реальные документы — раньше цитаты из
+    клеймов терялись). RBAC общий с cite_key: map строится из ТЕХ ЖЕ строк
+    _CITE_KEY_QUERY, где partner-фильтр уже применён в Cypher — непубличные doc_id
+    партнёру в map не попадают.
 
     Читаем прямо из сериализованного подграфа (узлы/рёбра уже отфильтрованы по роли
     format_subgraph — partner-internal claims сюда не попадут). cite_key поддерживающих
@@ -118,7 +127,7 @@ def _claim_stats(db: Neo4jClient, serialized: dict[str, Any], role: str = "",
 
     claim_ids = [n["key"] for n in nodes if n.get("label") == Node.CLAIM]
     if not claim_ids:
-        return []
+        return [], {}
 
     # Число SUPPORTED_BY и наличие CONTRADICTS считаем по рёбрам подграфа.
     support: dict[str, int] = {cid: 0 for cid in claim_ids}
@@ -133,8 +142,9 @@ def _claim_stats(db: Neo4jClient, serialized: dict[str, Any], role: str = "",
                 if cid in contradicts:
                     contradicts[cid] += 1
 
-    # cite_key поддерживающих документов по каждому Claim.
+    # cite_key поддерживающих документов по каждому Claim + общий cite_map.
     cite_keys: dict[str, list[str]] = {cid: [] for cid in claim_ids}
+    cite_map: dict[str, str] = {}
     for r in db.read(_CITE_KEY_QUERY, {
         "claim_ids": claim_ids,
         "is_partner": is_partner,
@@ -148,6 +158,11 @@ def _claim_stats(db: Neo4jClient, serialized: dict[str, Any], role: str = "",
             ck = _cite_key(doc.get("authors"), doc.get("year"))
             if ck not in keys:
                 keys.append(ck)
+            # Первый встреченный doc_id закрепляется за cite_key (коллизия
+            # «однофамилец + тот же год» редка; семантика в оркестраторе всё
+            # равно перекрывает map своими значениями поверх).
+            if doc.get("doc_id"):
+                cite_map.setdefault(ck, str(doc["doc_id"]))
         cite_keys[cid] = keys
 
     claim_text = {n["key"]: (n.get("props") or {}).get("text") for n in nodes
@@ -167,7 +182,7 @@ def _claim_stats(db: Neo4jClient, serialized: dict[str, Any], role: str = "",
                 "supporting_cite_keys": cite_keys.get(cid, []),
             }
         )
-    return stats
+    return stats, cite_map
 
 
 def _experts(serialized: dict[str, Any]) -> list[dict[str, Any]]:
@@ -204,7 +219,8 @@ def run(
     db: Optional[Neo4jClient] = None,
     highlight_gap_keys: Optional[set[str]] = None,
 ) -> dict[str, Any]:
-    """graph_search(node_keys, role, depth≤4) → {nodes, edges, stats, experts, citations} (§5.2).
+    """graph_search(node_keys, role, depth≤4) → {nodes, edges, stats, experts, citations,
+    cite_map} (§5.2).
 
     node_keys — стабильные ключи стартовых узлов (canonical_id/doc_id/…). Пустой список →
     пустой подграф. Роль применяется пост-фильтрами в format_subgraph (§7).
@@ -218,7 +234,8 @@ def run(
 
     node_keys = [k for k in (node_keys or []) if k]
     if not node_keys:
-        return {"nodes": [], "edges": [], "stats": [], "experts": [], "citations": []}
+        return {"nodes": [], "edges": [], "stats": [], "experts": [], "citations": [],
+                "cite_map": {}}
 
     # (1) Степень стартовых узлов → отсечка хабов + топ-соседи (§5.2).
     normal_eids, hub_eids = _partition_hubs(db, node_keys, hub_threshold)
@@ -228,7 +245,8 @@ def run(
     # Дедуп сохраняем порядок.
     start_eids = list(dict.fromkeys(start_eids))
     if not start_eids:
-        return {"nodes": [], "edges": [], "stats": [], "experts": [], "citations": []}
+        return {"nodes": [], "edges": [], "stats": [], "experts": [], "citations": [],
+                "cite_map": {}}
 
     # (2) subgraphAll от отобранных eids — read_graph отдаёт neo4j.graph.Graph целиком.
     graph = db.read_graph(
@@ -262,7 +280,7 @@ def run(
         nonpublic_doc_ids=nonpublic,
     )
 
-    stats = _claim_stats(db, serialized, role=role, nonpublic_doc_ids=nonpublic)
+    stats, cite_map = _claim_stats(db, serialized, role=role, nonpublic_doc_ids=nonpublic)
     experts = _experts(serialized)
     citations = _citations(stats)
 
@@ -272,4 +290,8 @@ def run(
         "stats": stats,
         "experts": experts,
         "citations": citations,
+        # Точный маппинг cite_key→doc_id (RBAC применён в _CITE_KEY_QUERY) —
+        # плоский citations выше сохранён как есть: на него завязаны оркестратор
+        # и partner-фильтрация.
+        "cite_map": cite_map,
     }
