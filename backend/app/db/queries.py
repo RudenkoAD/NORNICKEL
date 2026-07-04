@@ -8,7 +8,9 @@
 Инварианты, за которые отвечает этот модуль:
 - Все читающие шаблоны исключают soft-deleted рёбра (`r.deleted IS NULL`) и, для partner,
   Document{access_level:'internal'} (§6, §7).
-- Строгие числовые фильтры отбрасывают факты `needs_review` (§4.2): `r.needs_review IS NULL`.
+- Строгие числовые фильтры отбрасывают факты `needs_review` (§4.2): валидатор
+  пишет needs_review=false (не NULL), поэтому фильтр — coalesce(...,false)=false
+  (04.07: `IS NULL` отсекал ВСЕ факты — валидатор всегда ставит bool).
 - Consensus/Claims — только не устаревшие: `c.superseded_by IS NULL` (§5.2).
 - Динамические ключи свойств/типов рёбер — только через APOC (Cypher-параметр ключом быть
   не может), но значения — всегда параметры (никакой конкатенации пользовательского ввода).
@@ -159,7 +161,7 @@ def build_strict_filters(
                 f"WHERE type(r) IN $numeric_rel_types AND r.source_doc_id = d.doc_id "
                 f"AND (r.value_min IS NULL OR ${mx} IS NULL OR r.value_min <= ${mx}) "
                 f"AND (r.value_max IS NULL OR ${mn} IS NULL OR r.value_max >= ${mn}) "
-                f"AND r.needs_review IS NULL AND r.deleted IS NULL }}"
+                f"AND coalesce(r.needs_review, false) = false AND r.deleted IS NULL }}"
             )
             params[p] = nf["param"]
             params[mn] = nf["value_min"]
@@ -194,8 +196,9 @@ def build_strict_filters(
 # ---------------------------------------------------------------------------
 PARAM_RANGE_MATCH = f"""
 MATCH (x)-[r:{Rel.HAS_CONDITION}]->(p:{Node.PARAMETER} {{canonical_id: $param}})
-WHERE r.value_min <= $q_max AND r.value_max >= $q_min
-  AND r.needs_review IS NULL AND r.deleted IS NULL
+WHERE (r.value_min IS NULL OR $q_max IS NULL OR r.value_min <= $q_max)
+  AND (r.value_max IS NULL OR $q_min IS NULL OR r.value_max >= $q_min)
+  AND coalesce(r.needs_review, false) = false AND r.deleted IS NULL
 RETURN x, r
 """.strip()
 

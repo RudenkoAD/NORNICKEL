@@ -30,9 +30,13 @@ def test_schema_splits_into_expected_statements() -> None:
 def test_strict_filters_interval_predicate_and_needs_review() -> None:
     filters = {"numeric": [{"param": "param_sulfate", "value_min": 250.0, "value_max": 250.0}]}
     cypher, params = q.build_strict_filters(filters, role="researcher")
-    assert "r.value_min <= $num0_max" in cypher
-    assert "r.value_max >= $num0_min" in cypher
-    assert "r.needs_review IS NULL" in cypher  # инвариант №1 / §4.2
+    # Пересечение интервалов с защитой полуоткрытых границ (04.07).
+    assert "IS NULL OR r.value_min <= $num0_max" in cypher
+    assert "IS NULL OR r.value_max >= $num0_min" in cypher
+    # 04.07: валидатор пишет needs_review=false (не NULL) → фильтр coalesce, а не IS NULL
+    # (IS NULL отсекал ВСЕ факты — критический баг, найден detect_contradictions).
+    assert "coalesce(r.needs_review, false) = false" in cypher
+    assert "r.needs_review IS NULL" not in cypher
     assert "r.deleted IS NULL" in cypher       # soft-delete исключается
     assert params["num0_param"] == "param_sulfate"
     assert params["num0_min"] == 250.0 and params["num0_max"] == 250.0
