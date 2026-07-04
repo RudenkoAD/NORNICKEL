@@ -34,7 +34,7 @@ import re
 import unicodedata
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import yaml
 
@@ -45,6 +45,10 @@ def _key_prop(label: str) -> str:
     return KEY_PROPERTY.get(label, "canonical_id")
 
 log = logging.getLogger(__name__)
+
+# Warn-once по недоступности fulltext-фолбэка (нет индекса/БД) — иначе по строке
+# лога на каждый термин каждого запроса.
+_FT_FALLBACK_WARNED = False
 
 # Пути по умолчанию (§4.4): backend/data/reference и backend/data/glossary.yaml.
 _DATA_DIR = Path(__file__).resolve().parents[2] / "data"
@@ -296,13 +300,9 @@ class Canonizer:
         подтверждения. Fulltext-fallback к Neo4j — TODO (клиент None), пока сразу slug.
         """
         self._check_label(label)
-        hit = self.lookup(name, label)
+        hit = self.lookup(name, label)  # включает fulltext-фолбэк при наличии клиента
         if hit is not None:
             return hit
-
-        # TODO(§4.4): при подключённом Neo4j-клиенте — fulltext-запрос по entity_names
-        #   (порог score); нашли — маппим и дозаписываем alias. Пока client=None → slug.
-        self._fulltext_fallback(name, label)
 
         # Каноническая форма заглушки — лемма («катодного никеля» → «катодный никель»):
         # разные падежи одного термина сходятся в один узел, исходное имя — в aliases.
@@ -528,51 +528,78 @@ class Canonizer:
             entity.aliases_text = " ".join(entity.aliases)
 
     def _fulltext_fallback(self, name: str, label: str) -> Optional[CanonEntity]:
-        """Fulltext-fallback к Neo4j: поиск по entity_names для lookup/resolve (§4.4).
+        """Fulltext-fallback к Neo4j: поиск по entity_names для lookup (§4.4).
 
-        Когда сущность не найдена в справочниках, ищем её в уже загруженных узлах графа
-        (unresolved-сущности из импорта, эксперты/процессы из документов). При попадании
-        возвращаем CanonEntity, собранный из свойств узла; иначе None.
+        Схема «кандидаты → точная приёмка» (04.07): fulltext — только ГЕНЕРАТОР
+        кандидатов (топ-5 по скору), приёмка — детерминированная. Кандидат проходит,
+        только если normalize(term) или normalize(lemmatize(term)) посимвольно равны
+        одному из его нормализованных имён/алиасов — та же проверка, которой матчится
+        справочник, но по алиасам живого графа. Lucene-скор порогом НЕ является
+        (BM25 не нормирован; прежний `score > 1.5` с fuzzy-хвостом мог молча подменить
+        сущность в фильтрах — ложное попадание тут дороже промаха: промах штатно
+        уходит в semantic_search через query_text, §5.1).
+
+        Неоднозначность (несколько прошедших приёмку — в графе есть дубли):
+        референсный узел важнее unresolved, дальше по скору; >1 прошедших — debug-лог
+        как сигнал для цикла консолидации синонимов.
         """
         if self._client is None:
             return None
+        norm = self.normalize(name)
+        if not norm or len(norm) < 2:
+            return None
+        lemma_norm = self.normalize(self.lemmatize(name))
+        accepted_keys = {norm, lemma_norm}
+        # Экранируем спецсимволы Lucene: + - && || ! ( ) { } [ ] ^ " ~ * ? : \ /
+        safe = re.sub(r"([+\-&|!(){}[\]^\"~*?:\\/])", r"\\\1", norm)
         try:
-            import re as _re
-
-            norm = self.normalize(name)
-            if not norm or len(norm) < 2:
-                return None
-            # Экранируем спецсимволы Lucene: + - && || ! ( ) { } [ ] ^ " ~ * ? : \ /
-            safe = _re.sub(r"([+\-&|!(){}[\]^\"~*?:\\/])", r"\\\1", norm)
-            query = f'"{safe}" OR {safe}~'
             rows = self._client.read(
                 "CALL db.index.fulltext.queryNodes('entity_names', $q) "
-                "YIELD node, score WHERE score > 1.5 AND $label IN labels(node) "
+                "YIELD node, score WHERE $label IN labels(node) "
                 "RETURN node, score ORDER BY score DESC LIMIT 5",
-                {"q": query, "label": label},
+                {"q": f'"{safe}"', "label": label},
             )
-            if not rows:
-                return None
-            node = rows[0]["node"]
-            score = rows[0]["score"]
-            key = _key_prop(label)
-            cid = node.get(key) or node.get("canonical_id")
-            if not cid:
-                return None
-            entity = CanonEntity(
-                canonical_id=cid,
-                label=label,
-                name_ru=node.get("name_ru") or node.get("name"),
-                name_en=node.get("name_en"),
-                aliases=node.get("aliases") or [],
-                aliases_text=node.get("aliases_text") or "",
-                unresolved=bool(node.get("unresolved")),
-                extra=node.get("extra") or {},
-            )
-            log.debug("canonizer: fulltext hit %r → %s (score=%.1f)", name, cid, score)
-            return entity
-        except Exception:
+        except Exception as err:  # noqa: BLE001 — инфраструктура (нет индекса/БД)
+            global _FT_FALLBACK_WARNED
+            if not _FT_FALLBACK_WARNED:
+                _FT_FALLBACK_WARNED = True
+                log.warning("canonizer: fulltext-фолбэк недоступен (%s) — "
+                            "термины запроса уходят в semantic_search", err)
             return None
+
+        verified: list[tuple[bool, float, Any]] = []
+        for row in rows:
+            node = row["node"]
+            names = [node.get("name_ru"), node.get("name_en"), node.get("name"),
+                     *(node.get("aliases") or [])]
+            node_keys = {self.normalize(n) for n in names if n}
+            if accepted_keys & node_keys:
+                verified.append((bool(node.get("unresolved")), -float(row["score"]), node))
+            else:
+                log.debug("canonizer: fulltext-кандидат отвергнут приёмкой: %r vs %s",
+                          name, sorted(node_keys)[:4])
+        if not verified:
+            return None
+        if len(verified) > 1:
+            log.debug("canonizer: %d узлов прошли приёмку для %r (%s) — дубли, "
+                      "кандидаты в консолидацию синонимов", len(verified), name, label)
+        verified.sort()  # (unresolved=False раньше, затем больший скор)
+        node = verified[0][2]
+        cid = node.get(_key_prop(label)) or node.get("canonical_id")
+        if not cid:
+            return None
+        entity = CanonEntity(
+            canonical_id=cid,
+            label=label,
+            name_ru=node.get("name_ru") or node.get("name"),
+            name_en=node.get("name_en"),
+            aliases=node.get("aliases") or [],
+            aliases_text=node.get("aliases_text") or "",
+            unresolved=bool(node.get("unresolved")),
+            extra=node.get("extra") or {},
+        )
+        log.debug("canonizer: fulltext-приёмка %r → %s", name, cid)
+        return entity
 
     @staticmethod
     def _check_label(label: str) -> None:

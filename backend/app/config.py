@@ -91,6 +91,9 @@ class Settings(BaseSettings):
     # --- LLM-провайдер: yandex | openrouter ---
     llm_provider: str = "yandex"
     openrouter_api_key: Optional[str] = None
+    # Прямой OpenAI — только для эмбеддингов (каталог OpenRouter их не содержит,
+    # проверено 04.07); чат остаётся на openrouter_api_key.
+    openai_api_key: Optional[str] = None
     openrouter_model_extract: Optional[str] = None  # напр. deepseek/deepseek-chat
     openrouter_model_synth: Optional[str] = None
     openrouter_model_planner: Optional[str] = None

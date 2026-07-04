@@ -26,6 +26,7 @@ from app.db.queries import (
     DOC_ACCESS_MAP,
     build_docs_by_ids,
 )
+from app.llm.emb_space import ensure_space
 from app.llm.embeddings import embed_query
 from app.llm.yandex import LLMError
 
@@ -110,6 +111,10 @@ async def run(
     """
     db = db or get_client()
     cache = cache or get_filter_cache()
+
+    # Инвариант №7: вектора запроса обязаны жить в том же пространстве, что вектора
+    # графа — иначе косинус = шум. Несовпадение маркера → громкая LLMError.
+    ensure_space(db)
 
     vectors = await _embed_query_texts(query_text_ru, query_text_en)
     if not vectors:

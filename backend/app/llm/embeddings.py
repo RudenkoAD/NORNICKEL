@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import math
 from typing import Optional
 
 import httpx
@@ -23,7 +24,15 @@ YANDEX_EMBEDDING_URL = (
     "https://llm.api.cloud.yandex.net/foundationModels/v1/textEmbedding"
 )
 OPENROUTER_EMBEDDING_URL = "https://openrouter.ai/api/v1/embeddings"
-OPENROUTER_EMBEDDING_MODEL = "openai/text-embedding-3-small"
+OPENAI_EMBEDDING_URL = "https://api.openai.com/v1/embeddings"
+# 04.07: large@256 (матрёшечная нарезка) ≈ small на полных 1536 по MTEB — при
+# бюджете $2-5 на корпус (~6М токенов × $0.13/М ≈ $0.8) выбор очевиден.
+# ВАЖНО: модель = сигнатура векторного пространства (emb_space, инвариант №7).
+OPENAI_EMBEDDING_MODEL = "text-embedding-3-large"
+# У эмбеддингов OpenRouter ОТДЕЛЬНЫЙ каталог /api/v1/embeddings/models (в общем
+# /models их нет — 04.07 это чуть не увело нас на прямой OpenAI); 3-large там
+# есть по той же цене. Прямой OpenAI-маршрут остаётся опцией через OPENAI_API_KEY.
+OPENROUTER_EMBEDDING_MODEL = f"openai/{OPENAI_EMBEDDING_MODEL}"
 
 MODEL_DOC = "doc"
 MODEL_QUERY = "query"
@@ -61,8 +70,16 @@ def _provider(settings: Settings) -> str:
 def _emb_headers(settings: Settings) -> dict[str, str]:
     prov = _provider(settings)
     if prov == "openrouter":
+        # Приоритет — прямой OpenAI (у OpenRouter эмбеддингов в каталоге нет);
+        # модель ОДНА в обоих маршрутах → векторное пространство одно (№7).
+        if getattr(settings, "openai_api_key", None):
+            return {
+                "Authorization": f"Bearer {settings.openai_api_key}",
+                "Content-Type": "application/json",
+            }
         if not settings.openrouter_api_key:
-            raise LLMError("OPENROUTER_API_KEY не задан — эмбеддинги недоступны.")
+            raise LLMError("Ни OPENAI_API_KEY, ни OPENROUTER_API_KEY не заданы — "
+                           "эмбеддинги недоступны.")
         return {
             "Authorization": f"Bearer {settings.openrouter_api_key}",
             "Content-Type": "application/json",
@@ -80,6 +97,12 @@ def _emb_headers(settings: Settings) -> dict[str, str]:
 def _emb_url_payload(settings: Settings, model_type: str, text: str) -> tuple[str, dict]:
     prov = _provider(settings)
     if prov == "openrouter":
+        if getattr(settings, "openai_api_key", None):
+            return OPENAI_EMBEDDING_URL, {
+                "model": OPENAI_EMBEDDING_MODEL,
+                "input": text,
+                "dimensions": settings.emb_dim,
+            }
         return OPENROUTER_EMBEDDING_URL, {
             "model": OPENROUTER_EMBEDDING_MODEL,
             "input": text,
@@ -127,6 +150,14 @@ def _extract_vector(data: dict, settings: Settings) -> list[float]:
     if not isinstance(vec_raw, list) or not vec_raw:
         raise ValueError(f"Ответ эмбеддинга без поля embedding: {data!r}")
     vec = [float(x) for x in vec_raw]
+    # Прокси может игнорировать параметр dimensions (в доках OpenRouter его нет) и
+    # вернуть полный вектор (3-large → 3072). Для OpenAI v3 матрёшечная нарезка
+    # «усечь + L2-нормализовать» официально эквивалентна dimensions=N — детерминизм
+    # тот же, пространство то же.
+    if prov == "openrouter" and len(vec) > settings.emb_dim:
+        head = vec[: settings.emb_dim]
+        norm = math.sqrt(sum(x * x for x in head)) or 1.0
+        vec = [x / norm for x in head]
     _assert_dim(vec, settings)
     return vec
 

@@ -23,7 +23,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.db.neo4j_client import Neo4jClient  # noqa: E402
+from app.db.neo4j_client import Neo4jClient
+from app.llm.emb_space import ensure_space  # noqa: E402
 from app.llm import embeddings as emb  # noqa: E402
 from app.llm.yandex import LLMError  # noqa: E402
 
@@ -101,6 +102,10 @@ async def main() -> int:
     if not client.wait_until_ready(timeout_s=30):
         print("Neo4j недоступен", file=sys.stderr)
         return 1
+
+    # Инвариант №7: занять/сверить векторное пространство ДО заливки — писать
+    # вектора чужой модели в наполовину заэмбеженный граф нельзя.
+    ensure_space(client)
 
     while True:
         done, remaining, quota_alive = await run_pass(client, args.limit)
