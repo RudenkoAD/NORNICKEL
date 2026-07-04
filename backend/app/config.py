@@ -88,6 +88,13 @@ class Settings(BaseSettings):
     yc_model_planner: Optional[str] = None
     llm_timeout_s: int = 15  # инвариант №9: таймаут, 1 ретрай, затем явная ошибка
 
+    # --- LLM-провайдер: yandex | openrouter ---
+    llm_provider: str = "yandex"
+    openrouter_api_key: Optional[str] = None
+    openrouter_model_extract: Optional[str] = None  # напр. deepseek/deepseek-chat
+    openrouter_model_synth: Optional[str] = None
+    openrouter_model_planner: Optional[str] = None
+
     # --- Рантайм ---
     uvicorn_workers: int = 1  # инвариант №8: кэши in-memory — строго 1 процесс
 

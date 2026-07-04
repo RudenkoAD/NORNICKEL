@@ -40,11 +40,17 @@ class LLMError(Exception):
 
 
 class YandexLLM:
-    """Async-клиент к OpenAI-совместимому chat endpoint Yandex AI Studio.
+    """Async-клиент к OpenAI-совместимому chat endpoint.
+
+    Поддерживает два провайдера (LLM_PROVIDER в .env):
+      - yandex:    Yandex AI Studio  (Authorization: Api-Key, base gpt://...)
+      - openrouter: OpenRouter        (Authorization: Bearer, base openrouter.ai/api/v1)
 
     Модель по умолчанию — `settings.yc_model_extract`; вызывающий может передать любой
     URI через аргумент `model`. temperature по умолчанию 0.0 (детерминированное извлечение).
     """
+
+    OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
     def __init__(
         self,
@@ -53,23 +59,31 @@ class YandexLLM:
         default_model: Optional[str] = None,
     ) -> None:
         self._s = settings or get_settings()
-        if not self._s.yc_api_key:
-            # Не бросаем на конструкторе (объект создаётся при импорте модулей), но
-            # первый же вызов упадёт понятной LLMError — см. _headers().
-            log.warning("YC_API_KEY не задан — вызовы LLM будут падать LLMError.")
-        self._base_url = YANDEX_OPENAI_BASE_URL
-        # По умолчанию — онлайновый fail-fast бюджет (LLM_TIMEOUT_S, инвариант №9,
-        # SSE/query-путь §5). Офлайн-импорт (ingest_corpus.py) передаёт больший
-        # timeout_s: сильная модель-экстрактор (qwen3-235b) отвечает 30-40 c, и
-        # 15-секундный таймаут рвал КАЖДЫЙ чанк (ReadTimeout с пустым текстом).
+        self._provider = self._s.llm_provider.lower()
+
+        if self._provider == "openrouter":
+            if not self._s.openrouter_api_key:
+                log.warning("OPENROUTER_API_KEY не задан — вызовы LLM будут падать LLMError.")
+            self._base_url = self.OPENROUTER_BASE_URL
+        else:
+            if not self._s.yc_api_key:
+                log.warning("YC_API_KEY не задан — вызовы LLM будут падать LLMError.")
+            self._base_url = YANDEX_OPENAI_BASE_URL
+
         self._timeout = float(timeout_s) if timeout_s else float(self._s.llm_timeout_s)
-        # Приоритет модели: аргумент вызова → default_model инстанса → YC_MODEL_EXTRACT.
-        # default_model нужен второму проходу (§двухпроходная схема: ingest_corpus
-        # --model qwen3-235b… пере-извлекает «плохие» документы сильной моделью).
         self._default_model = default_model
 
     # --- служебное ---
     def _headers(self) -> dict[str, str]:
+        if self._provider == "openrouter":
+            if not self._s.openrouter_api_key:
+                raise LLMError("OPENROUTER_API_KEY не задан в .env — LLM недоступна (инвариант №9).")
+            return {
+                "Authorization": f"Bearer {self._s.openrouter_api_key}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "http://localhost:8000",
+                "X-Title": "Nornickel RAG",
+            }
         if not self._s.yc_api_key:
             raise LLMError("YC_API_KEY не задан в .env — LLM недоступна (инвариант №9).")
         return {
@@ -78,16 +92,21 @@ class YandexLLM:
         }
 
     def _resolve_model(self, model: Optional[str]) -> str:
+        if self._provider == "openrouter":
+            chosen = model or self._default_model or self._s.openrouter_model_extract
+            if not chosen:
+                raise LLMError(
+                    "Модель LLM не задана: передайте model или выставьте "
+                    "OPENROUTER_MODEL_EXTRACT в .env."
+                )
+            return chosen
+
         chosen = model or self._default_model or self._s.yc_model_extract
         if not chosen:
             raise LLMError(
                 "Модель LLM не задана: передайте model=gpt://<folder>/<model>/<ver> "
                 "или выставьте YC_MODEL_EXTRACT в .env."
             )
-        # Короткое имя каталога (`<model>/<ver>`, напр. «yandexgpt/rc» из smoke_llm.py)
-        # разворачиваем в полный URI `gpt://<folder>/<model>/<ver>`. Уже полный URI
-        # (`gpt://…`, `emb://…`) или подставленный `<folder>`-плейсхолдер не трогаем —
-        # иначе Yandex отдаёт 400 «Failed to parse model URI».
         if "://" not in chosen:
             if not self._s.yc_folder_id:
                 raise LLMError(

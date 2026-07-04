@@ -40,6 +40,10 @@ import yaml
 
 from app.db.constants import KEY_PROPERTY, Node
 
+
+def _key_prop(label: str) -> str:
+    return KEY_PROPERTY.get(label, "canonical_id")
+
 log = logging.getLogger(__name__)
 
 # Пути по умолчанию (§4.4): backend/data/reference и backend/data/glossary.yaml.
@@ -212,7 +216,6 @@ class Canonizer:
     ) -> None:
         self.reference_dir = Path(reference_dir) if reference_dir else DEFAULT_REFERENCE_DIR
         self.glossary_path = Path(glossary_path) if glossary_path else DEFAULT_GLOSSARY_PATH
-        # Fulltext-fallback к Neo4j на этом этапе не делаем (§4.4): клиент = None, заглушка.
         self._client = neo4j_client
 
         # Индекс: (label, нормализованный_alias) -> CanonEntity. Один и тот же alias у
@@ -339,6 +342,9 @@ class Canonizer:
         БЕЗ создания узлов и БЕЗ дозаписи алиасов — иначе каждый вопрос с опечаткой
         рождал бы мусорные узлы и ложные «пробелы» (§4.4). Нерезолвнутый термин запроса
         планировщик оставляет в query_text для semantic_search (§5.1).
+
+        Если справочного попадания нет — fallback к fulltext Neo4j (entity_names): ищет
+        уже существующие в графе unresolved-сущности и сущности без справочной записи.
         """
         self._check_label(label)
         norm = self.normalize(name)
@@ -358,6 +364,10 @@ class Canonizer:
             hit = self._index.get((label, variant))
             if hit is not None:
                 return hit
+        # Neo4j fulltext fallback: ищем в уже загруженных узлах графа.
+        ft_hit = self._fulltext_fallback(name, label)
+        if ft_hit is not None:
+            return ft_hit
         return None
 
     # ------------------------------------------------------------------ #
@@ -517,15 +527,52 @@ class Canonizer:
             entity.aliases.append(norm_alias)
             entity.aliases_text = " ".join(entity.aliases)
 
-    def _fulltext_fallback(self, name: str, label: str) -> None:
-        """Заглушка fulltext-fallback к Neo4j (§4.4). На этом этапе клиент = None.
+    def _fulltext_fallback(self, name: str, label: str) -> Optional[CanonEntity]:
+        """Fulltext-fallback к Neo4j: поиск по entity_names для lookup/resolve (§4.4).
 
-        TODO(§4.4): когда canonizer получит Neo4j-клиент — здесь fulltext-запрос по
-        индексу entity_names с порогом score; при попадании маппить имя на найденный
-        canonical_id и дозаписывать alias. Пока клиента нет — no-op, resolve() уходит в
-        slug.
+        Когда сущность не найдена в справочниках, ищем её в уже загруженных узлах графа
+        (unresolved-сущности из импорта, эксперты/процессы из документов). При попадании
+        возвращаем CanonEntity, собранный из свойств узла; иначе None.
         """
-        return None
+        if self._client is None:
+            return None
+        try:
+            import re as _re
+
+            norm = self.normalize(name)
+            if not norm or len(norm) < 2:
+                return None
+            # Экранируем спецсимволы Lucene: + - && || ! ( ) { } [ ] ^ " ~ * ? : \ /
+            safe = _re.sub(r"([+\-&|!(){}[\]^\"~*?:\\/])", r"\\\1", norm)
+            query = f'"{safe}" OR {safe}~'
+            rows = self._client.read(
+                "CALL db.index.fulltext.queryNodes('entity_names', $q) "
+                "YIELD node, score WHERE score > 1.5 AND $label IN labels(node) "
+                "RETURN node, score ORDER BY score DESC LIMIT 5",
+                {"q": query, "label": label},
+            )
+            if not rows:
+                return None
+            node = rows[0]["node"]
+            score = rows[0]["score"]
+            key = _key_prop(label)
+            cid = node.get(key) or node.get("canonical_id")
+            if not cid:
+                return None
+            entity = CanonEntity(
+                canonical_id=cid,
+                label=label,
+                name_ru=node.get("name_ru") or node.get("name"),
+                name_en=node.get("name_en"),
+                aliases=node.get("aliases") or [],
+                aliases_text=node.get("aliases_text") or "",
+                unresolved=bool(node.get("unresolved")),
+                extra=node.get("extra") or {},
+            )
+            log.debug("canonizer: fulltext hit %r → %s (score=%.1f)", name, cid, score)
+            return entity
+        except Exception:
+            return None
 
     @staticmethod
     def _check_label(label: str) -> None:

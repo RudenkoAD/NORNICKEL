@@ -341,7 +341,9 @@ def discover_files(corpus: Path, glob: str, limit: Optional[int]) -> list[Path]:
     files = [
         p
         for p in sorted(corpus.rglob(glob))
-        if p.is_file() and p.suffix.lower() in SUPPORTED_SUFFIXES
+        if p.is_file()
+        and p.suffix.lower() in SUPPORTED_SUFFIXES
+        and not p.name.startswith("~$")  # временные файлы Office
     ]
     if limit is not None:
         files = files[:limit]

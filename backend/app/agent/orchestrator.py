@@ -61,7 +61,8 @@ _UNITS: Optional[UnitRegistry] = None
 def _canonizer() -> Canonizer:
     global _CANONIZER
     if _CANONIZER is None:
-        _CANONIZER = Canonizer()
+        from app.db.neo4j_client import Neo4jClient as _NC
+        _CANONIZER = Canonizer(neo4j_client=_NC(get_settings()))
     return _CANONIZER
 
 
@@ -74,11 +75,15 @@ def _units() -> UnitRegistry:
 
 def _planner_model() -> Optional[str]:
     s = get_settings()
+    if s.llm_provider == "openrouter":
+        return s.openrouter_model_planner or s.openrouter_model_extract
     return s.yc_model_planner or s.yc_model_extract
 
 
 def _synth_model() -> Optional[str]:
     s = get_settings()
+    if s.llm_provider == "openrouter":
+        return s.openrouter_model_synth or s.openrouter_model_extract
     return s.yc_model_synth or s.yc_model_extract
 
 
@@ -273,9 +278,23 @@ async def answer_stream(question: str, role: str) -> AsyncIterator[dict]:
 
     try:
         # --- 1. Планирование (§5.1) ---
+        log.info("orchestrator: planning for question=%r", question[:120])
         plan = await planner_mod.plan(
             llm, question, canonizer=canonizer, units=units, model=_planner_model()
         )
+        log.info("orchestrator: plan intent=%s filters(materials=%s, processes=%s, params=%s, "
+                 "equip=%s, numeric=%d, geo=%s, years=%s-%s, doc_types=%s) notes=%s",
+                 plan.get("intent"),
+                 len(plan.get("filters", {}).get("materials") or []),
+                 len(plan.get("filters", {}).get("processes") or []),
+                 len(plan.get("filters", {}).get("parameters") or []),
+                 len(plan.get("filters", {}).get("equipment") or []),
+                 len(plan.get("filters", {}).get("numeric") or []),
+                 plan.get("filters", {}).get("geography"),
+                 plan.get("filters", {}).get("year_from"),
+                 plan.get("filters", {}).get("year_to"),
+                 plan.get("filters", {}).get("doc_types"),
+                 plan.get("notes"))
         yield {"event": "plan", "data": plan}
 
         intent = plan.get("intent", "search")
@@ -362,7 +381,14 @@ async def answer_stream(question: str, role: str) -> AsyncIterator[dict]:
         else:  # search / review
             top_k = _TOP_K.get(intent, 20)
             depth = _DEPTH.get(intent, 2)
+            log.info("orchestrator: running search pipeline intent=%s top_k=%d depth=%d",
+                     intent, top_k, depth)
             strict, docs, graph, gaps = await _run_search_pipeline(plan, role, top_k, depth)
+            log.info("orchestrator: pipeline done — strict_count=%s zeroed_by=%s "
+                     "docs=%d graph_nodes=%d graph_edges=%d graph_claims=%d",
+                     strict["count"], strict.get("zeroed_by"),
+                     len(docs), len(graph.get("nodes", [])),
+                     len(graph.get("edges", [])), len(graph.get("stats", [])))
             yield {"event": "tool_result",
                    "data": {"tool": "strict_filters",
                             "summary": {"count": strict["count"],
@@ -433,9 +459,9 @@ async def _synthesize(
     """
     if out_of_scope:
         context_block = (
-            "Вопрос вне тематики карты знаний R&D (болтовня / просьба вне охвата). "
+            "Вопрос не относится к тематике загруженных документов (болтовня / вне охвата). "
             "Ответь коротко и вежливо; если это просьба загрузить документ — подскажи, "
-            "что импорт делается через POST /documents (§5.1). Ссылок [cite_key] не ставь."
+            "что импорт делается через POST /documents. Ссылок [cite_key] не ставь."
         )
     else:
         context_block = _serialize_context(plan, docs, graph, gaps, strict, branches)
