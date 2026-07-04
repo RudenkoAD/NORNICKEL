@@ -5,7 +5,7 @@ const fsp = fs.promises;
 const path = require("path");
 
 const config = require("../config");
-const { watcher } = require("../../core");
+const { watcher } = require("../core");
 const bootstrapRoutes = require("../routes/bootstrap");
 
 const {
