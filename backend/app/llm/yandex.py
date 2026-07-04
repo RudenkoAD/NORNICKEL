@@ -156,6 +156,7 @@ class YandexLLM:
         payload = {
             "model": self._resolve_model(model),
             "temperature": temperature,
+            "reasoning": {"enabled": False},
             "messages": [
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
@@ -274,6 +275,7 @@ class YandexLLM:
         base_payload = {
             "model": model_uri,
             "temperature": temperature,
+            "reasoning": {"enabled": False},
             "response_format": response_format,
             "messages": [
                 {"role": "system", "content": system},
