@@ -32,6 +32,18 @@ categories:
   economic:
     canonical_unit: "руб/т"
     abs_delta: null          # для денег «около 0» бессмысленно → needs_review
+  economic_usd:
+    canonical_unit: "$/т"
+    abs_delta: null          # 04.07: своя категория — внутри валюты точно, курс не нужен
+  money_rub:
+    canonical_unit: "млн руб"
+    abs_delta: null          # 04.07: абсолютные суммы (ТЭП, капзатраты)
+  money_usd:
+    canonical_unit: "млн USD"
+    abs_delta: null
+  power:
+    canonical_unit: "кВт"
+    abs_delta: 0.1           # 04.07: энергетика установок
   environment:
     canonical_unit: null     # категориальные условия среды — value_text, без чисел
     abs_delta: null
@@ -250,15 +262,53 @@ units:
   "об.%":     {category: recovery, multiplier: 1.0, offset: 0.0}
   "г/т":      {category: recovery, multiplier: 0.0001, offset: 0.0}  # ппм по массе ≈ 1e-4 %
 
+  # --- Валюта за тонну (USD) и абсолютные суммы (04.07: внутри валюты — точно) ---
+  "USD/t":    {category: economic_usd, multiplier: 1.0, offset: 0.0}
+  "долл/т":   {category: economic_usd, multiplier: 1.0, offset: 0.0}
+  "долл./т":  {category: economic_usd, multiplier: 1.0, offset: 0.0}
+  "млн руб":  {category: money_rub, multiplier: 1.0, offset: 0.0}
+  "млн руб.": {category: money_rub, multiplier: 1.0, offset: 0.0}
+  "млн рублей": {category: money_rub, multiplier: 1.0, offset: 0.0}
+  "млрд руб": {category: money_rub, multiplier: 1000.0, offset: 0.0}
+  "млрд руб.": {category: money_rub, multiplier: 1000.0, offset: 0.0}
+  "тыс. руб.": {category: money_rub, multiplier: 0.001, offset: 0.0}
+  "млн USD":  {category: money_usd, multiplier: 1.0, offset: 0.0}
+  "млн долл.": {category: money_usd, multiplier: 1.0, offset: 0.0}
+  "млн долл": {category: money_usd, multiplier: 1.0, offset: 0.0}
+  "млн дол.": {category: money_usd, multiplier: 1.0, offset: 0.0}
+  "млрд долл.": {category: money_usd, multiplier: 1000.0, offset: 0.0}
+  "млрд USD": {category: money_usd, multiplier: 1000.0, offset: 0.0}
+  "млрд дол.": {category: money_usd, multiplier: 1000.0, offset: 0.0}
+  "трлн долл.": {category: money_usd, multiplier: 1000000.0, offset: 0.0}
+
+  # --- Мощность → кВт (04.07) ---
+  "кВт":      {category: power, multiplier: 1.0, offset: 0.0}
+  "kW":       {category: power, multiplier: 1.0, offset: 0.0}
+  "МВт":      {category: power, multiplier: 1000.0, offset: 0.0}
+  "MW":       {category: power, multiplier: 1000.0, offset: 0.0}
+
+  # --- Календарное время → мин (04.07: аппроксимация год=365 сут, месяц=30.42 сут —
+  #     приемлемо для ТЭП-горизонтов «срок окупаемости 7 лет») ---
+  "год":      {category: time, multiplier: 525600.0, offset: 0.0}
+  "года":     {category: time, multiplier: 525600.0, offset: 0.0}
+  "лет":      {category: time, multiplier: 525600.0, offset: 0.0}
+  "мес.":     {category: time, multiplier: 43800.0, offset: 0.0}
+  "мес":      {category: time, multiplier: 43800.0, offset: 0.0}
+  "месяцев":  {category: time, multiplier: 43800.0, offset: 0.0}
+  "месяца":   {category: time, multiplier: 43800.0, offset: 0.0}
+
+  # --- Карат → г (04.07: драгкамни, ровно 0.2 г) ---
+  "карат":    {category: mass, multiplier: 0.2, offset: 0.0}
+
   # --- Экономические (ТЭП, §1 сценарий 6) → руб/т ---
   "руб/т":    {category: economic, multiplier: 1.0, offset: 0.0}
   "руб./т":   {category: economic, multiplier: 1.0, offset: 0.0}
   "р/т":      {category: economic, multiplier: 1.0, offset: 0.0}
   "руб/тонну": {category: economic, multiplier: 1.0, offset: 0.0}
   "тыс. руб/т": {category: economic, multiplier: 1000.0, offset: 0.0}
-  "$/т":      {category: economic, multiplier: null, offset: 0.0}   # курс валют не конвертируем
+  "$/т":      {category: economic_usd, multiplier: 1.0, offset: 0.0}  # 04.07: своя категория
   "$/t":      {category: economic, multiplier: null, offset: 0.0}
-  "USD/т":    {category: economic, multiplier: null, offset: 0.0}
+  "USD/т":    {category: economic_usd, multiplier: 1.0, offset: 0.0}
   "долл/т":   {category: economic, multiplier: null, offset: 0.0}
 
   # --- Пополнение 03.07-2 (второй проход qwen): масс.%, навески, объёмы ---

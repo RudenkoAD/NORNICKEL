@@ -55,3 +55,7 @@ reverberatory_furnace,отражательная печь,reverberatory furnace,
 induction_furnace,индукционная печь,induction furnace,индукционная тигельная печь,furnace
 dc_furnace,печь постоянного тока,DC furnace,дуговая печь постоянного тока,furnace
 arc_furnace,дуговая сталеплавильная печь,electric arc furnace,ДСП;дуговая печь,furnace
+# --- Пополнение 04.07 (консолидация по графу, партия №1: геомеханика/ПО). ---
+cae_fidesys,CAE Fidesys,CAE Fidesys,Fidesys;программный комплекс CAE Fidesys,software
+axial_extensometer,осевой экстензометр,axial extensometer,,sensor
+radial_extensometer,радиальный экстензометр,radial extensometer,,sensor

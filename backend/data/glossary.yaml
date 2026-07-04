@@ -436,3 +436,43 @@ slag_viscosity:
   label: Parameter
   ru: [вязкость шлака]
   en: [slag viscosity]
+
+# ===========================================================================
+# Пополнение 04.07 (консолидация по графу, партия №1: журналы «Горная
+# промышленность»/«Цветные металлы» + конференции; домен геомеханики/НДС массива).
+# Частые (≥3 упоминаний) доменные сущности, оседавшие в графе как unresolved-узлы.
+# canonical_id совпадают с новыми строками reference/*.csv — load_references сшивает.
+# ===========================================================================
+
+# --- Параметры ---
+rock_quality_designation:
+  label: Parameter
+  ru: [RQD, показатель качества породы, индекс RQD]
+  en: [RQD, rock quality designation]
+
+economic_effect:
+  label: Parameter
+  ru: [экономический эффект, экономический эффект от внедрения]
+  en: [economic effect, economic benefit]
+
+# --- Процессы ---
+overcoring:
+  label: Process
+  ru: [полная разгрузка керна, метод полной разгрузки керна, разгрузка керна]
+  en: [overcoring, overcoring method]
+
+# --- Оборудование ---
+cae_fidesys:
+  label: Equipment
+  ru: [CAE Fidesys, Fidesys, программный комплекс CAE Fidesys]
+  en: [CAE Fidesys]
+
+axial_extensometer:
+  label: Equipment
+  ru: [осевой экстензометр]
+  en: [axial extensometer]
+
+radial_extensometer:
+  label: Equipment
+  ru: [радиальный экстензометр]
+  en: [radial extensometer]

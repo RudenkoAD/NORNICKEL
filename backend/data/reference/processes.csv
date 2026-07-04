@@ -73,3 +73,5 @@ coalescence,коалесценция,coalescence,коалесценция сул
 thermodynamic_modeling,термодинамическое моделирование,thermodynamic modeling,термодинамический расчёт;термодинамический расчет,pyro
 so2_utilization,утилизация диоксида серы,SO2 utilization,утилизация SO2,eco
 drill_and_blast,буровзрывные работы,drill and blasting,буровзрывная работа;БВР,waste
+# --- Пополнение 04.07 (консолидация по графу, партия №1: измерение НДС массива). ---
+overcoring,полная разгрузка керна,overcoring,метод полной разгрузки керна;разгрузка керна;overcoring method,waste

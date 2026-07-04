@@ -87,3 +87,6 @@ rock_stress,напряжение в массиве,rock stress,напряжен�
 seismic_energy,энергия сейсмособытия,seismic energy,энергия исследуемого сейсмособытия,other,Дж
 wave_velocity,скорость продольных волн,wave velocity,скорость смещения;пиковая скорость,other,м/с
 dip_angle,угол падения,dip angle,наклон скважин,other,град
+# --- Пополнение 04.07 (консолидация по графу, партия №1: геомеханика/ТЭП). ---
+rock_quality_designation,RQD,rock quality designation,показатель качества породы;индекс RQD,other,%
+economic_effect,экономический эффект,economic effect,экономический эффект от внедрения,economic,руб/т

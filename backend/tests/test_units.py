@@ -114,11 +114,15 @@ def test_convert_unknown_raises(registry: UnitRegistry) -> None:
         registry.convert(1.0, "фунтов/дюйм")
 
 
-def test_currency_unit_known_but_not_convertible(registry: UnitRegistry) -> None:
-    """$/т в whitelist (is_known=True), но без множителя — convert бросает ошибку."""
-    assert registry.is_known("$/т")
-    with pytest.raises(UnknownUnitError):
-        registry.convert(100.0, "$/т")
+def test_currency_units_convert_within_currency(registry: UnitRegistry) -> None:
+    """04.07: валюты — свои категории (economic_usd/money_*): внутри валюты конвертация
+    точная (без курсов), МЕЖДУ валютами не пересекаются (разные canonical_unit)."""
+    v, canon = registry.convert(100.0, "$/т")
+    assert canon == "$/т" and v == 100.0
+    v, canon = registry.convert(2.0, "млрд руб.")
+    assert canon == "млн руб" and v == 2000.0
+    # руб/т и $/т живут в РАЗНЫХ категориях — фильтр их не смешает.
+    assert registry.convert(1.0, "руб/т")[1] != registry.convert(1.0, "USD/т")[1]
 
 
 def test_register_unknown_and_report() -> None:
