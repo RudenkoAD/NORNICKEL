@@ -53,10 +53,12 @@ async function openAndHighlight(app, path, quote) {
 }
 
 let _graphData = null;
+let _graphView = null;
 
 class GraphView extends ItemView {
   constructor(leaf) {
     super(leaf);
+    _graphView = this;
   }
 
   getViewType() {
@@ -92,12 +94,28 @@ class GraphView extends ItemView {
     });
   }
 
+  setData(nodes, edges) {
+    if (this._svelte) {
+      this._svelte.$set({ nodes, edges });
+    } else {
+      const container = this.containerEl.children[1];
+      container.empty();
+      this._svelte = new window.IgnisUI.GraphPane({
+        target: container,
+        props: { nodes, edges },
+      });
+    }
+  }
+
   async onClose() {
     if (this._svelte) {
       this._svelte.$destroy();
       this._svelte = null;
     }
-    _graphData = null;
+    if (_graphView === this) {
+      _graphView = null;
+      _graphData = null;
+    }
   }
 }
 
@@ -211,6 +229,9 @@ class IgnisAgentPlugin extends Plugin {
 
     const existing = workspace.getLeavesOfType(GRAPH_VIEW_TYPE);
     if (existing.length > 0) {
+      if (_graphView && _graphData) {
+        _graphView.setData(_graphData.nodes || [], _graphData.edges || []);
+      }
       workspace.revealLeaf(existing[0]);
       return;
     }
