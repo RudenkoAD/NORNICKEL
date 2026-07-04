@@ -103,6 +103,187 @@ categories:
     canonical_unit: null
     abs_delta: null
 
+  # --- Категории 04.07 (Haiku-консолидация) ---
+  amount_of_substance:
+    canonical_unit: "кмоль"
+    abs_delta: null      # «около 0» → needs_review
+  apparent_power:
+    canonical_unit: "МВ·А"
+    abs_delta: null      # «около 0» → needs_review
+  area_rate:
+    canonical_unit: "м²/мес"
+    abs_delta: null      # «около 0» → needs_review
+  current:
+    canonical_unit: "кА"
+    abs_delta: null      # «около 0» → needs_review
+  distribution_coefficient:
+    canonical_unit: "л/г"
+    abs_delta: null      # «около 0» → needs_review
+  economic_cny:
+    canonical_unit: "юань/т"
+    abs_delta: null      # «около 0» → needs_review
+  economic_eur:
+    canonical_unit: "€/т"
+    abs_delta: null      # «около 0» → needs_review
+  economic_jpy:
+    canonical_unit: "JPY/г"
+    abs_delta: null      # «около 0» → needs_review
+  economic_usd_per_barrel:
+    canonical_unit: "$/барр"
+    abs_delta: null      # «около 0» → needs_review
+  economic_usd_per_tonne_day:
+    canonical_unit: "$/т·сут"
+    abs_delta: null      # «около 0» → needs_review
+  electric_field_strength:
+    canonical_unit: "В/м"
+    abs_delta: null      # «около 0» → needs_review
+  electrical_resistivity:
+    canonical_unit: "мкОм·м"
+    abs_delta: null      # «около 0» → needs_review
+  energy_per_area:
+    canonical_unit: "Дж/м²"
+    abs_delta: null      # «около 0» → needs_review
+  energy_price_usd:
+    canonical_unit: "¢/кВт·ч"
+    abs_delta: null      # «около 0» → needs_review
+  exchange_rate_usd_eur:
+    canonical_unit: "$/€"
+    abs_delta: null      # «около 0» → needs_review
+  filtration_productivity:
+    canonical_unit: "кг/(м²·цикл)"
+    abs_delta: null      # «около 0» → needs_review
+  force:
+    canonical_unit: "кН"
+    abs_delta: null      # «около 0» → needs_review
+  growth_rate:
+    canonical_unit: "%/год"
+    abs_delta: null      # «около 0» → needs_review
+  heating_rate:
+    canonical_unit: "°C/мин"
+    abs_delta: null      # «около 0» → needs_review
+  kinematic_viscosity:
+    canonical_unit: "м²/с"
+    abs_delta: null      # «около 0» → needs_review
+  labor_intensity:
+    canonical_unit: "чел·ч/т"
+    abs_delta: null      # «около 0» → needs_review
+  linear_energy:
+    canonical_unit: "Дж/мм"
+    abs_delta: null      # «около 0» → needs_review
+  magnetic_field_strength:
+    canonical_unit: "кА/м"
+    abs_delta: null      # «около 0» → needs_review
+  magnetic_induction:
+    canonical_unit: "Тл"
+    abs_delta: null      # «около 0» → needs_review
+  mass_flux:
+    canonical_unit: "г/(м²·ч)"
+    abs_delta: null      # «около 0» → needs_review
+  mass_per_power:
+    canonical_unit: "т/МВт"
+    abs_delta: null      # «около 0» → needs_review
+  molar_concentration:
+    canonical_unit: "моль/л"
+    abs_delta: null      # «около 0» → needs_review
+  molar_energy:
+    canonical_unit: "кДж/моль"
+    abs_delta: null      # «около 0» → needs_review
+  molar_mass:
+    canonical_unit: "г/моль"
+    abs_delta: null      # «около 0» → needs_review
+  molar_ratio:
+    canonical_unit: "моль/моль"
+    abs_delta: null      # «около 0» → needs_review
+  money_cny:
+    canonical_unit: "млн RMB"
+    abs_delta: null      # «около 0» → needs_review
+  money_gbp:
+    canonical_unit: "млн GBP"
+    abs_delta: null      # «около 0» → needs_review
+  noise_level:
+    canonical_unit: "дБА"
+    abs_delta: null      # «около 0» → needs_review
+  normality:
+    canonical_unit: "н"
+    abs_delta: null      # «около 0» → needs_review
+  number_density:
+    canonical_unit: "мм⁻³"
+    abs_delta: null      # «около 0» → needs_review
+  per_capita_mass:
+    canonical_unit: "кг/чел"
+    abs_delta: null      # «около 0» → needs_review
+  per_capita_mass_rate:
+    canonical_unit: "кг/чел/год"
+    abs_delta: null      # «около 0» → needs_review
+  percent_rate:
+    canonical_unit: "%/мин"
+    abs_delta: null      # «около 0» → needs_review
+  power_density:
+    canonical_unit: "кВт/м³"
+    abs_delta: null      # «около 0» → needs_review
+  radiation_damage:
+    canonical_unit: "сна"
+    abs_delta: null      # «около 0» → needs_review
+  rotation_speed:
+    canonical_unit: "об/мин"
+    abs_delta: null      # «около 0» → needs_review
+  sorption_capacity_molar:
+    canonical_unit: "ммоль/г"
+    abs_delta: null      # «около 0» → needs_review
+  specific_capacity:
+    canonical_unit: "мА·ч/г"
+    abs_delta: null      # «около 0» → needs_review
+  specific_consumption:
+    canonical_unit: "кг/т"
+    abs_delta: null      # «около 0» → needs_review
+  specific_emission:
+    canonical_unit: "г/кВт·ч"
+    abs_delta: null      # «около 0» → needs_review
+  specific_energy:
+    canonical_unit: "кВт·ч/т"
+    abs_delta: null      # «около 0» → needs_review
+  specific_flow_per_volume:
+    canonical_unit: "м³/(м³·ч)"
+    abs_delta: null      # «около 0» → needs_review
+  specific_mass_throughput:
+    canonical_unit: "т/(м³·ч)"
+    abs_delta: null      # «около 0» → needs_review
+  specific_power:
+    canonical_unit: "кВт/кг"
+    abs_delta: null      # «около 0» → needs_review
+  specific_surface:
+    canonical_unit: "м²/кг"
+    abs_delta: null      # «около 0» → needs_review
+  specific_throughput:
+    canonical_unit: "т/(ч·м²)"
+    abs_delta: null      # «около 0» → needs_review
+  specific_volume_consumption:
+    canonical_unit: "м³/т"
+    abs_delta: null      # «около 0» → needs_review
+  surface_area_flux:
+    canonical_unit: "м²/(м²·с)"
+    abs_delta: null      # «около 0» → needs_review
+  surface_density:
+    canonical_unit: "кг/м²"
+    abs_delta: null      # «около 0» → needs_review
+  surface_power_density:
+    canonical_unit: "мВт/см²"
+    abs_delta: null      # «около 0» → needs_review
+  temperature_rate:
+    canonical_unit: "К/с"
+    abs_delta: null      # «около 0» → needs_review
+  thermal_conductivity:
+    canonical_unit: "Вт/(м·К)"
+    abs_delta: null      # «около 0» → needs_review
+  thermo_emf:
+    canonical_unit: "мВ/град"
+    abs_delta: null      # «около 0» → needs_review
+  volumetric_energy_density:
+    canonical_unit: "МДж/м³"
+    abs_delta: null      # «около 0» → needs_review
+  volumetric_heat_capacity:
+    canonical_unit: "МДж/(м³·К)"
+    abs_delta: null      # «около 0» → needs_review
 units:
   # --- Концентрация → мг/л ---
   "мг/л":     {category: concentration, multiplier: 1.0, offset: 0.0}
@@ -307,9 +488,8 @@ units:
   "руб/тонну": {category: economic, multiplier: 1.0, offset: 0.0}
   "тыс. руб/т": {category: economic, multiplier: 1000.0, offset: 0.0}
   "$/т":      {category: economic_usd, multiplier: 1.0, offset: 0.0}  # 04.07: своя категория
-  "$/t":      {category: economic, multiplier: null, offset: 0.0}
+  "$/t":      {category: economic_usd, multiplier: 1.0, offset: 0.0}
   "USD/т":    {category: economic_usd, multiplier: 1.0, offset: 0.0}
-  "долл/т":   {category: economic, multiplier: null, offset: 0.0}
 
   # --- Пополнение 03.07-2 (второй проход qwen): масс.%, навески, объёмы ---
   "% масс.":  {category: recovery, multiplier: 1.0, offset: 0.0}   # массовая доля
@@ -434,3 +614,440 @@ units:
   "день":     {category: time, multiplier: 1440.0, offset: 0.0}
   "мс":       {category: time, multiplier: 0.0000166667, offset: 0.0}
   "ms":       {category: time, multiplier: 0.0000166667, offset: 0.0}
+
+# --- Пополнение 04.07: консолидация Haiku-корпуса (workflow units-consolidation, верифицировано) ---
+  "t": {category: mass, multiplier: 1000000, offset: 0.0}
+  "kt": {category: mass, multiplier: 1000000000, offset: 0.0}
+  "tonnes": {category: mass, multiplier: 1000000, offset: 0.0}
+  "Mt": {category: mass, multiplier: 1000000000000, offset: 0.0}
+  "$ / tonne": {category: economic_usd, multiplier: 1, offset: 0.0}
+  "$/oz": {category: economic_usd, multiplier: 32150.7466, offset: 0.0}
+  "million tonnes": {category: mass, multiplier: 1000000000000, offset: 0.0}
+  "kt/a": {category: mass_rate, multiplier: 2.73972603, offset: 0.0}
+  "t/y": {category: mass_rate, multiplier: 0.00273973, offset: 0.0}
+  "oC": {category: temperature, multiplier: 1, offset: 0.0}
+  "ktpy": {category: mass_rate, multiplier: 2.73972603, offset: 0.0}
+  "ppm": {category: recovery, multiplier: 0.0001, offset: 0.0}
+  "US$/t": {category: economic_usd, multiplier: 1, offset: 0.0}
+  "yuan/t": {category: economic_cny, multiplier: 1, offset: 0.0}
+  "000 ozs": {category: mass, multiplier: 31103.4768, offset: 0.0}
+  "metric tonnes": {category: mass, multiplier: 1000000, offset: 0.0}
+  "кг/т": {category: specific_consumption, multiplier: 1, offset: 0.0}
+  "koz": {category: mass, multiplier: 31103.4768, offset: 0.0}
+  "tonnes/year": {category: mass_rate, multiplier: 0.00273973, offset: 0.0}
+  "ounces": {category: mass, multiplier: 31.1034768, offset: 0.0}
+  "000t": {category: mass, multiplier: 1000000000, offset: 0.0}
+  "RMB/t": {category: economic_cny, multiplier: 1, offset: 0.0}
+  "$/lb": {category: economic_usd, multiplier: 2204.62262, offset: 0.0}
+  "g/t": {category: recovery, multiplier: 0.0001, offset: 0.0}
+  "USD/oz": {category: economic_usd, multiplier: 32150.7466, offset: 0.0}
+  "млн т/г": {category: mass_rate, multiplier: 2739.72603, offset: 0.0}
+  "об/мин": {category: rotation_speed, multiplier: 1, offset: 0.0}
+  "/oz": {category: economic_usd, multiplier: 32150.7466, offset: 0.0}
+  "M ounces": {category: mass, multiplier: 31103476.8, offset: 0.0}
+  "000 tonnes": {category: mass, multiplier: 1000000000, offset: 0.0}
+  "˚С": {category: temperature, multiplier: 1, offset: 0.0}
+  "tpy": {category: mass_rate, multiplier: 0.00273973, offset: 0.0}
+  "oz": {category: mass, multiplier: 31.1034768, offset: 0.0}
+  "US$ per tonne": {category: economic_usd, multiplier: 1, offset: 0.0}
+  "тыс т/г": {category: mass_rate, multiplier: 2.73972603, offset: 0.0}
+  "моль/л": {category: molar_concentration, multiplier: 1, offset: 0.0}
+  "tonnes per year": {category: mass_rate, multiplier: 0.00273973, offset: 0.0}
+  "Mt/a": {category: mass_rate, multiplier: 2739.72603, offset: 0.0}
+  "US$B": {category: money_usd, multiplier: 1000, offset: 0.0}
+  "US$/tonne": {category: economic_usd, multiplier: 1, offset: 0.0}
+  "/tonne": {category: economic_usd, multiplier: 1, offset: 0.0}
+  "тыс т": {category: mass, multiplier: 1000000000, offset: 0.0}
+  "thousand ounces": {category: mass, multiplier: 31103.4768, offset: 0.0}
+  "kt/d": {category: mass_rate, multiplier: 1000, offset: 0.0}
+  "% мас.": {category: recovery, multiplier: 1, offset: 0.0}
+  "Тл": {category: magnetic_induction, multiplier: 1, offset: 0.0}
+  "/t": {category: economic_usd, multiplier: 1, offset: 0.0}
+  "ф/кв.дюйм": {category: pressure, multiplier: 0.006894757, offset: 0.0}
+  "US$/oz": {category: economic_usd, multiplier: 32150.7466, offset: 0.0}
+  "Mtpy": {category: mass_rate, multiplier: 2739.72603, offset: 0.0}
+  "t/d": {category: mass_rate, multiplier: 1, offset: 0.0}
+  "c/lb": {category: economic_usd, multiplier: 22.0462262, offset: 0.0}
+  "weeks": {category: time, multiplier: 10080, offset: 0.0}
+  "days": {category: time, multiplier: 1440, offset: 0.0}
+  "000tpa": {category: mass_rate, multiplier: 2.73972603, offset: 0.0}
+  "years": {category: time, multiplier: 525600, offset: 0.0}
+  "M oz": {category: mass, multiplier: 31103476.8, offset: 0.0}
+  "%/yr": {category: growth_rate, multiplier: 1, offset: 0.0}
+  "кА": {category: current, multiplier: 1, offset: 0.0}
+  "mt": {category: mass, multiplier: 1000000000000, offset: 0.0}
+  "kg": {category: mass, multiplier: 1000, offset: 0.0}
+  "/lb": {category: economic_usd, multiplier: 2204.62262, offset: 0.0}
+  "¢/lb": {category: economic_usd, multiplier: 22.0462262, offset: 0.0}
+  "thousand tonnes": {category: mass, multiplier: 1000000000, offset: 0.0}
+  "RMB/kg": {category: economic_cny, multiplier: 1000, offset: 0.0}
+  "т/час": {category: mass_rate, multiplier: 24, offset: 0.0}
+  "0С": {category: temperature, multiplier: 1, offset: 0.0}
+  "г/м2час": {category: mass_flux, multiplier: 1, offset: 0.0}
+  "кг/м2": {category: surface_density, multiplier: 1, offset: 0.0}
+  "мин–1": {category: frequency, multiplier: 0.0166667, offset: 0.0}
+  "мг/г": {category: recovery, multiplier: 0.1, offset: 0.0}
+  "Вт": {category: power, multiplier: 0.001, offset: 0.0}
+  "million ounces": {category: mass, multiplier: 31103476.8, offset: 0.0}
+  "months": {category: time, multiplier: 43800, offset: 0.0}
+  "Mt/y": {category: mass_rate, multiplier: 2739.72603, offset: 0.0}
+  "Дж/м2": {category: energy_per_area, multiplier: 1, offset: 0.0}
+  "м2": {category: area, multiplier: 10000, offset: 0.0}
+  "кВт·ч/т": {category: specific_energy, multiplier: 1, offset: 0.0}
+  "кмоль": {category: amount_of_substance, multiplier: 1, offset: 0.0}
+  "ktpa": {category: mass_rate, multiplier: 2.73972603, offset: 0.0}
+  "million ozs": {category: mass, multiplier: 31103476.8, offset: 0.0}
+  "'000 tonnes": {category: mass, multiplier: 1000000000, offset: 0.0}
+  "% Cu": {category: recovery, multiplier: 1, offset: 0.0}
+  "000t/y": {category: mass_rate, multiplier: 2.73972603, offset: 0.0}
+  "tonne per year": {category: mass_rate, multiplier: 0.00273973, offset: 0.0}
+  "thousand metric tonnes": {category: mass, multiplier: 1000000000, offset: 0.0}
+  "Kt-Cu": {category: mass, multiplier: 1000000000, offset: 0.0}
+  "million tons": {category: mass, multiplier: 1000000000000, offset: 0.0}
+  "т/г": {category: mass_rate, multiplier: 0.00273973, offset: 0.0}
+  "кВт·час/т": {category: specific_energy, multiplier: 1, offset: 0.0}
+  "˚C": {category: temperature, multiplier: 1, offset: 0.0}
+  "моль/моль": {category: molar_ratio, multiplier: 1, offset: 0.0}
+  "% отн.": {category: recovery, multiplier: 1, offset: 0.0}
+  "$/tonne": {category: economic_usd, multiplier: 1, offset: 0.0}
+  "мм–3": {category: number_density, multiplier: 1, offset: 0.0}
+  "кА/м": {category: magnetic_field_strength, multiplier: 1, offset: 0.0}
+  "Вт/см3": {category: power_density, multiplier: 1000, offset: 0.0}
+  "млн м3": {category: volume, multiplier: 1000000000, offset: 0.0}
+  "м2/г": {category: specific_surface, multiplier: 1000, offset: 0.0}
+  "тыс. руб./кг": {category: economic, multiplier: 1000000, offset: 0.0}
+  "руб./кг": {category: economic, multiplier: 1000, offset: 0.0}
+  "% (мас.)": {category: recovery, multiplier: 1, offset: 0.0}
+  "м3/мин": {category: flow_rate, multiplier: 60, offset: 0.0}
+  "кг/(м2·цикл)": {category: filtration_productivity, multiplier: 1, offset: 0.0}
+  "кДж/моль": {category: molar_energy, multiplier: 1, offset: 0.0}
+  "wt%": {category: recovery, multiplier: 1, offset: 0.0}
+  "minutes": {category: time, multiplier: 1, offset: 0.0}
+  "hours": {category: time, multiplier: 60, offset: 0.0}
+  "mm": {category: size, multiplier: 1000, offset: 0.0}
+  "$/tonne Cu equiv.": {category: economic_usd, multiplier: 1, offset: 0.0}
+  "$m": {category: money_usd, multiplier: 1, offset: 0.0}
+  "koz/y": {category: mass_rate, multiplier: 8.5215e-05, offset: 0.0}
+  "kt/y": {category: mass_rate, multiplier: 2.73972603, offset: 0.0}
+  "kg standard coal/t": {category: specific_consumption, multiplier: 1, offset: 0.0}
+  "kt Cu": {category: mass, multiplier: 1000000000, offset: 0.0}
+  "billion": {category: money_usd, multiplier: 1000, offset: 0.0}
+  "M tonnes": {category: mass, multiplier: 1000000000000, offset: 0.0}
+  "$t": {category: economic_usd, multiplier: 1, offset: 0.0}
+  "tpm": {category: mass_rate, multiplier: 0.0328767, offset: 0.0}
+  "m tonnes": {category: mass, multiplier: 1000000000000, offset: 0.0}
+  "tons": {category: mass, multiplier: 1000000, offset: 0.0}
+  "US dollars per ton": {category: economic_usd, multiplier: 1, offset: 0.0}
+  "thousand tons Cu": {category: mass, multiplier: 1000000000, offset: 0.0}
+  "USD/tonne": {category: economic_usd, multiplier: 1, offset: 0.0}
+  "US$/lb": {category: economic_usd, multiplier: 2204.62262, offset: 0.0}
+  "кг/куб.м": {category: density, multiplier: 0.001, offset: 0.0}
+  "ºС": {category: temperature, multiplier: 1, offset: 0.0}
+  "мА·ч/г": {category: specific_capacity, multiplier: 1, offset: 0.0}
+  "кг/кг": {category: specific_consumption, multiplier: 1000, offset: 0.0}
+  "тыс. м3/сут": {category: flow_rate, multiplier: 41.6667, offset: 0.0}
+  "град.": {category: angle, multiplier: 1, offset: 0.0}
+  "тыс. т в год": {category: mass_rate, multiplier: 2.73972603, offset: 0.0}
+  "кВт.ч/т": {category: specific_energy, multiplier: 1, offset: 0.0}
+  "млн т/год": {category: mass_rate, multiplier: 2739.72603, offset: 0.0}
+  "кг/т проплава": {category: specific_consumption, multiplier: 1, offset: 0.0}
+  "кг/т руды": {category: specific_consumption, multiplier: 1, offset: 0.0}
+  "мг/(см2·с)": {category: mass_flux, multiplier: 36000, offset: 0.0}
+  "Н/см2": {category: pressure, multiplier: 0.01, offset: 0.0}
+  "тыс. тр. унц.": {category: mass, multiplier: 31103.4768, offset: 0.0}
+  "А/см2": {category: current_density, multiplier: 10000, offset: 0.0}
+  "моль/дм3": {category: molar_concentration, multiplier: 1, offset: 0.0}
+  "т/(ч.м2)": {category: specific_throughput, multiplier: 1, offset: 0.0}
+  "см3/мин": {category: flow_rate, multiplier: 6.0e-05, offset: 0.0}
+  "% (ат.)": {category: recovery, multiplier: 1, offset: 0.0}
+  "kg/tonne": {category: specific_consumption, multiplier: 1, offset: 0.0}
+  "ºC": {category: temperature, multiplier: 1, offset: 0.0}
+  "kg/t": {category: specific_consumption, multiplier: 1, offset: 0.0}
+  "kt Ni": {category: mass, multiplier: 1000000000, offset: 0.0}
+  "deg C": {category: temperature, multiplier: 1, offset: 0.0}
+  "GJ/tonne": {category: specific_energy, multiplier: 277.778, offset: 0.0}
+  "m/min": {category: velocity, multiplier: 0.0166667, offset: 0.0}
+  "million tpy": {category: mass_rate, multiplier: 2739.72603, offset: 0.0}
+  "tpa": {category: mass_rate, multiplier: 0.00273973, offset: 0.0}
+  "billion tons": {category: mass, multiplier: 1000000000000000, offset: 0.0}
+  "mg/Nm3": {category: concentration, multiplier: 0.001, offset: 0.0}
+  "million pounds": {category: mass, multiplier: 453592370, offset: 0.0}
+  "yen per gram": {category: economic_jpy, multiplier: 1, offset: 0.0}
+  "ozs": {category: mass, multiplier: 31.1034768, offset: 0.0}
+  "g/bhp.hr": {category: specific_emission, multiplier: 1.34102, offset: 0.0}
+  "mlnt": {category: mass, multiplier: 1000000000000, offset: 0.0}
+  "Kt": {category: mass, multiplier: 1000000000, offset: 0.0}
+  "per tonne": {category: economic_usd, multiplier: 1, offset: 0.0}
+  "tpd": {category: mass_rate, multiplier: 1, offset: 0.0}
+  "kt/a Cu": {category: mass_rate, multiplier: 2.73972603, offset: 0.0}
+  "kt/m": {category: mass_rate, multiplier: 32.8767123, offset: 0.0}
+  "c/lb Cu": {category: economic_usd, multiplier: 22.0462262, offset: 0.0}
+  "kWh/m3": {category: volumetric_energy_density, multiplier: 3.6, offset: 0.0}
+  "bn": {category: money_usd, multiplier: 1000, offset: 0.0}
+  "US$Bn": {category: money_usd, multiplier: 1000, offset: 0.0}
+  "US$/t Cu": {category: economic_usd, multiplier: 1, offset: 0.0}
+  "GW": {category: power, multiplier: 1000000, offset: 0.0}
+  "RMB/tonne": {category: economic_cny, multiplier: 1, offset: 0.0}
+  "US cents per pound": {category: economic_usd, multiplier: 22.0462262, offset: 0.0}
+  "m3/mts": {category: specific_volume_consumption, multiplier: 1, offset: 0.0}
+  "cents per pound": {category: economic_usd, multiplier: 22.0462262, offset: 0.0}
+  "кг/человека": {category: per_capita_mass, multiplier: 1, offset: 0.0}
+  "кВт×час": {category: energy, multiplier: 3600000, offset: 0.0}
+  "USD/унц": {category: economic_usd, multiplier: 32150.7466, offset: 0.0}
+  "кг/сек": {category: mass_rate, multiplier: 86.4, offset: 0.0}
+  "тыс т/сут": {category: mass_rate, multiplier: 1000, offset: 0.0}
+  "м3/час": {category: flow_rate, multiplier: 1, offset: 0.0}
+  "МДж/т": {category: specific_energy, multiplier: 0.2777778, offset: 0.0}
+  "кВт×час/т": {category: specific_energy, multiplier: 1, offset: 0.0}
+  "млн л/сут": {category: flow_rate, multiplier: 41.6667, offset: 0.0}
+  "К/с": {category: temperature_rate, multiplier: 1, offset: 0.0}
+  "мм/год": {category: velocity, multiplier: 3.171e-11, offset: 0.0}
+  "%отн": {category: recovery, multiplier: 1, offset: 0.0}
+  "mA∙h∙g−1": {category: specific_capacity, multiplier: 1, offset: 0.0}
+  "пг/м3": {category: concentration, multiplier: 1.0e-12, offset: 0.0}
+  "м/год": {category: velocity, multiplier: 3.171e-08, offset: 0.0}
+  "МДж/м3": {category: volumetric_energy_density, multiplier: 1, offset: 0.0}
+  "МДж/(м3·К)": {category: volumetric_heat_capacity, multiplier: 1, offset: 0.0}
+  "кг/дм3": {category: density, multiplier: 1, offset: 0.0}
+  "м2/(м2с)": {category: surface_area_flux, multiplier: 1, offset: 0.0}
+  "м/c": {category: velocity, multiplier: 1, offset: 0.0}
+  "кВт·ч/м2": {category: energy_per_area, multiplier: 3600000, offset: 0.0}
+  "мг/м3": {category: concentration, multiplier: 0.001, offset: 0.0}
+  "В/м": {category: electric_field_strength, multiplier: 1, offset: 0.0}
+  "Дж/мм": {category: linear_energy, multiplier: 1, offset: 0.0}
+  "долл./кг": {category: economic_usd, multiplier: 1000, offset: 0.0}
+  "км3": {category: volume, multiplier: 1000000000000, offset: 0.0}
+  "МДж/кг": {category: specific_energy, multiplier: 277.778, offset: 0.0}
+  "тыс. м3/год": {category: flow_rate, multiplier: 0.114155, offset: 0.0}
+  "мВ/град": {category: thermo_emf, multiplier: 1, offset: 0.0}
+  "нед": {category: time, multiplier: 10080, offset: 0.0}
+  "нм3/ч": {category: flow_rate, multiplier: 1, offset: 0.0}
+  "кН/брикет": {category: force, multiplier: 1, offset: 0.0}
+  "доли ед.": {category: recovery, multiplier: 100, offset: 0.0}
+  "%/мин": {category: percent_rate, multiplier: 1, offset: 0.0}
+  "куб. м/ч": {category: flow_rate, multiplier: 1, offset: 0.0}
+  "человекочас/т": {category: labor_intensity, multiplier: 1, offset: 0.0}
+  "% Ni": {category: recovery, multiplier: 1, offset: 0.0}
+  "103 м2/кг": {category: specific_surface, multiplier: 1000, offset: 0.0}
+  "эВ": {category: energy, multiplier: 1.602176634e-19, offset: 0.0}
+  "тыс. т/мес": {category: mass_rate, multiplier: 32.8767123, offset: 0.0}
+  "руб.": {category: money_rub, multiplier: 1.0e-06, offset: 0.0}
+  "моль/моль Cu": {category: molar_ratio, multiplier: 1, offset: 0.0}
+  "мм рт. ст.": {category: pressure, multiplier: 0.000133322, offset: 0.0}
+  "оС/мин": {category: heating_rate, multiplier: 1, offset: 0.0}
+  "А.см–2": {category: current_density, multiplier: 10000, offset: 0.0}
+  "возмущений в минуту": {category: frequency, multiplier: 0.0166667, offset: 0.0}
+  "кВт/кг": {category: specific_power, multiplier: 1, offset: 0.0}
+  "м3/(м3.ч)": {category: specific_flow_per_volume, multiplier: 1, offset: 0.0}
+  "т/(м3.ч)": {category: specific_mass_throughput, multiplier: 1, offset: 0.0}
+  "мол/л": {category: molar_concentration, multiplier: 1, offset: 0.0}
+  "г/моль": {category: molar_mass, multiplier: 1, offset: 0.0}
+  "·10–6 м2/с": {category: kinematic_viscosity, multiplier: 1.0e-06, offset: 0.0}
+  "микрометры": {category: size, multiplier: 1, offset: 0.0}
+  "г/с": {category: mass_rate, multiplier: 0.0864, offset: 0.0}
+  "м3/(мин·м3)": {category: specific_flow_per_volume, multiplier: 60, offset: 0.0}
+  "м3/ч на 1 м3": {category: specific_flow_per_volume, multiplier: 1, offset: 0.0}
+  "уд. об./ч": {category: specific_flow_per_volume, multiplier: 1, offset: 0.0}
+  "г-ион/л": {category: molar_concentration, multiplier: 1, offset: 0.0}
+  "мкг/г": {category: recovery, multiplier: 0.0001, offset: 0.0}
+  "т/(ч·м3)": {category: specific_mass_throughput, multiplier: 1, offset: 0.0}
+  "м3/(ч·м3)": {category: specific_flow_per_volume, multiplier: 1, offset: 0.0}
+  "сна": {category: radiation_damage, multiplier: 1, offset: 0.0}
+  "% (об.)": {category: recovery, multiplier: 1, offset: 0.0}
+  "ммоль/л": {category: molar_concentration, multiplier: 0.001, offset: 0.0}
+  "ммоль/г": {category: sorption_capacity_molar, multiplier: 1, offset: 0.0}
+  "г/кг": {category: recovery, multiplier: 0.1, offset: 0.0}
+  "мТл": {category: magnetic_induction, multiplier: 0.001, offset: 0.0}
+  "лог. ед.": {category: ph, multiplier: 1, offset: 0.0}
+  "Nm3/h": {category: flow_rate, multiplier: 1, offset: 0.0}
+  "°C/min": {category: heating_rate, multiplier: 1, offset: 0.0}
+  "% w/w": {category: recovery, multiplier: 1, offset: 0.0}
+  "tonnes/annum": {category: mass_rate, multiplier: 0.00273973, offset: 0.0}
+  "t/a": {category: mass_rate, multiplier: 0.00273973, offset: 0.0}
+  "kg tonne-1": {category: specific_consumption, multiplier: 1, offset: 0.0}
+  "$/t Ni": {category: economic_usd, multiplier: 1, offset: 0.0}
+  "Kg": {category: mass, multiplier: 1000, offset: 0.0}
+  "t/MW": {category: mass_per_power, multiplier: 1, offset: 0.0}
+  "kt-Ni": {category: mass, multiplier: 1000000000, offset: 0.0}
+  "metres per second": {category: velocity, multiplier: 1, offset: 0.0}
+  "thousand short tons": {category: mass, multiplier: 907184740, offset: 0.0}
+  "wt. %": {category: recovery, multiplier: 1, offset: 0.0}
+  "m3": {category: volume, multiplier: 1000, offset: 0.0}
+  "hour": {category: time, multiplier: 60, offset: 0.0}
+  "Nm3/hr": {category: flow_rate, multiplier: 1, offset: 0.0}
+  "tons/hour": {category: mass_rate, multiplier: 24, offset: 0.0}
+  "t coal/t copper": {category: specific_consumption, multiplier: 1000, offset: 0.0}
+  "% (w/v)": {category: concentration, multiplier: 10000, offset: 0.0}
+  "tonnes/hour": {category: mass_rate, multiplier: 24, offset: 0.0}
+  "µm s-1": {category: velocity, multiplier: 1.0e-06, offset: 0.0}
+  "kJ/mol": {category: molar_energy, multiplier: 1, offset: 0.0}
+  "feet": {category: length, multiplier: 0.3048, offset: 0.0}
+  "m3 per ton": {category: specific_volume_consumption, multiplier: 1, offset: 0.0}
+  "inch": {category: length, multiplier: 0.0254, offset: 0.0}
+  "mm/day": {category: velocity, multiplier: 1.1574074e-08, offset: 0.0}
+  "tph": {category: mass_rate, multiplier: 24, offset: 0.0}
+  "US$ million": {category: money_usd, multiplier: 1, offset: 0.0}
+  "$M": {category: money_usd, multiplier: 1, offset: 0.0}
+  "dtph": {category: mass_rate, multiplier: 24, offset: 0.0}
+  "meters per year": {category: velocity, multiplier: 3.1709792e-08, offset: 0.0}
+  "‰": {category: recovery, multiplier: 0.1, offset: 0.0}
+  "milliwatts per square centimeter": {category: surface_power_density, multiplier: 1, offset: 0.0}
+  "4E ounces/year": {category: mass_rate, multiplier: 8.5215e-08, offset: 0.0}
+  "oz/y": {category: mass_rate, multiplier: 8.5215e-08, offset: 0.0}
+  "W": {category: power, multiplier: 0.001, offset: 0.0}
+  "watts": {category: power, multiplier: 0.001, offset: 0.0}
+  "seconds": {category: time, multiplier: 0.0166667, offset: 0.0}
+  "g/tonne": {category: recovery, multiplier: 0.0001, offset: 0.0}
+  "oz a year": {category: mass_rate, multiplier: 8.5215e-08, offset: 0.0}
+  "oz/m": {category: mass_rate, multiplier: 1.0226e-06, offset: 0.0}
+  "ounce": {category: mass, multiplier: 31.1034768, offset: 0.0}
+  "£-million": {category: money_gbp, multiplier: 1, offset: 0.0}
+  "koz 4E/yr": {category: mass_rate, multiplier: 8.5215e-05, offset: 0.0}
+  "million oz": {category: mass, multiplier: 31103476.8, offset: 0.0}
+  "$/€": {category: exchange_rate_usd_eur, multiplier: 1, offset: 0.0}
+  "$/EUR": {category: exchange_rate_usd_eur, multiplier: 1, offset: 0.0}
+  "RMB/gram": {category: economic_cny, multiplier: 1000000, offset: 0.0}
+  "pct": {category: recovery, multiplier: 1, offset: 0.0}
+  "mlntpy": {category: mass_rate, multiplier: 2739.72603, offset: 0.0}
+  "tones": {category: mass, multiplier: 1000000, offset: 0.0}
+  "microns": {category: size, multiplier: 1, offset: 0.0}
+  "kwh/t": {category: specific_energy, multiplier: 1, offset: 0.0}
+  "kg SCE per ton": {category: specific_consumption, multiplier: 1, offset: 0.0}
+  "ktpd": {category: mass_rate, multiplier: 1000, offset: 0.0}
+  "US$/dmt": {category: economic_usd, multiplier: 1, offset: 0.0}
+  "RMB million": {category: money_cny, multiplier: 1, offset: 0.0}
+  "kdmt": {category: mass, multiplier: 1000000000, offset: 0.0}
+  "M$": {category: money_usd, multiplier: 1, offset: 0.0}
+  "Mdmt": {category: mass, multiplier: 1000000000000, offset: 0.0}
+  "% p.a.": {category: growth_rate, multiplier: 1, offset: 0.0}
+  "k dmt/a": {category: mass_rate, multiplier: 2.73972603, offset: 0.0}
+  "kWh/t": {category: specific_energy, multiplier: 1, offset: 0.0}
+  "GWh": {category: energy, multiplier: 3600000000000, offset: 0.0}
+  "c/kWh": {category: energy_price_usd, multiplier: 1, offset: 0.0}
+  "kWh/tonne": {category: specific_energy, multiplier: 1, offset: 0.0}
+  "tonnes/MW": {category: mass_per_power, multiplier: 1, offset: 0.0}
+  "US$/MWh": {category: energy_price_usd, multiplier: 0.1, offset: 0.0}
+  "Bn": {category: money_usd, multiplier: 1000, offset: 0.0}
+  "US$ millions": {category: money_usd, multiplier: 1, offset: 0.0}
+  "million square metres per month": {category: area_rate, multiplier: 1000000, offset: 0.0}
+  "000 tonnes contained Cu": {category: mass, multiplier: 1000000000, offset: 0.0}
+  "Mlbs/y": {category: mass_rate, multiplier: 1.2427188, offset: 0.0}
+  "US$M": {category: money_usd, multiplier: 1, offset: 0.0}
+  "cents per tonne per day": {category: economic_usd_per_tonne_day, multiplier: 0.01, offset: 0.0}
+  "'000 tonnes contained Cu": {category: mass, multiplier: 1000000000, offset: 0.0}
+  "million mt": {category: mass, multiplier: 1000000000000, offset: 0.0}
+  "$/mt": {category: economic_usd, multiplier: 1, offset: 0.0}
+  "m3/day": {category: flow_rate, multiplier: 0.0416667, offset: 0.0}
+  "day": {category: time, multiplier: 1440, offset: 0.0}
+  "billion US$": {category: money_usd, multiplier: 1000, offset: 0.0}
+  "square meters": {category: area, multiplier: 10000, offset: 0.0}
+  "t per year": {category: mass_rate, multiplier: 0.00273973, offset: 0.0}
+  "degrees Celsius": {category: temperature, multiplier: 1, offset: 0.0}
+  "tonne": {category: mass, multiplier: 1000000, offset: 0.0}
+  "€/tonne": {category: economic_eur, multiplier: 1, offset: 0.0}
+  "tonne-per-year": {category: mass_rate, multiplier: 0.00273973, offset: 0.0}
+  "tonnes/day": {category: mass_rate, multiplier: 1, offset: 0.0}
+  "kA": {category: current, multiplier: 1, offset: 0.0}
+  "month": {category: time, multiplier: 43800, offset: 0.0}
+  "kWh per-ton DC": {category: specific_energy, multiplier: 1, offset: 0.0}
+  "µg Cu/L": {category: concentration, multiplier: 0.001, offset: 0.0}
+  "kgs/person/year": {category: per_capita_mass_rate, multiplier: 1, offset: 0.0}
+  "US dollars per barrel": {category: economic_usd_per_barrel, multiplier: 1, offset: 0.0}
+  "Million tonnes": {category: mass, multiplier: 1000000000000, offset: 0.0}
+  "U.S. cents a day per tonne": {category: economic_usd_per_tonne_day, multiplier: 0.01, offset: 0.0}
+  "U.S. dollars per 1,000 tonnes per year": {category: economic_usd_per_tonne_day, multiplier: 2.73973e-06, offset: 0.0}
+  "U.S. dollars per tonne": {category: economic_usd, multiplier: 1, offset: 0.0}
+  "metric tons": {category: mass, multiplier: 1000000, offset: 0.0}
+  "thousand tons": {category: mass, multiplier: 1000000000, offset: 0.0}
+  "thousand metric tons": {category: mass, multiplier: 1000000000, offset: 0.0}
+  "mill t": {category: mass, multiplier: 1000000000000, offset: 0.0}
+  "дБА": {category: noise_level, multiplier: 1, offset: 0.0}
+  "м/мин": {category: velocity, multiplier: 0.0166667, offset: 0.0}
+  "MVA": {category: apparent_power, multiplier: 1, offset: 0.0}
+  "килопаскалей": {category: pressure, multiplier: 0.001, offset: 0.0}
+  "%вес": {category: recovery, multiplier: 1, offset: 0.0}
+  "тыс USD/т Ni": {category: economic_usd, multiplier: 1000, offset: 0.0}
+  "тыс т/мес": {category: mass_rate, multiplier: 32.8767123, offset: 0.0}
+  "USD/фунт": {category: economic_usd, multiplier: 2204.62262, offset: 0.0}
+  "кН": {category: force, multiplier: 1, offset: 0.0}
+  "% Niэкв.": {category: recovery, multiplier: 1, offset: 0.0}
+  "л/час": {category: flow_rate, multiplier: 0.001, offset: 0.0}
+  "MWR": {category: power, multiplier: 1000, offset: 0.0}
+  "микрон": {category: size, multiplier: 1, offset: 0.0}
+  "MПа": {category: pressure, multiplier: 1, offset: 0.0}
+  "куб.м/т": {category: specific_volume_consumption, multiplier: 1, offset: 0.0}
+  "МВт·ч/т": {category: specific_energy, multiplier: 1000, offset: 0.0}
+  "м/час": {category: velocity, multiplier: 0.000277778, offset: 0.0}
+  "нанометров": {category: size, multiplier: 0.001, offset: 0.0}
+  "га": {category: area, multiplier: 100000000, offset: 0.0}
+  "ат": {category: pressure, multiplier: 0.0980665, offset: 0.0}
+  "тонн": {category: mass, multiplier: 1000000, offset: 0.0}
+  "мг/кг": {category: recovery, multiplier: 0.0001, offset: 0.0}
+  "м2/кг": {category: specific_surface, multiplier: 1, offset: 0.0}
+  "Вольт": {category: voltage, multiplier: 1, offset: 0.0}
+  "н": {category: normality, multiplier: 1, offset: 0.0}
+  "мл/час": {category: flow_rate, multiplier: 1.0e-06, offset: 0.0}
+  "Па·сек": {category: viscosity, multiplier: 1, offset: 0.0}
+  "Вт·ч/кг": {category: specific_energy, multiplier: 1, offset: 0.0}
+  "кг H2O/час": {category: mass_rate, multiplier: 0.024, offset: 0.0}
+  "кг/час": {category: mass_rate, multiplier: 0.024, offset: 0.0}
+  "м/сек": {category: velocity, multiplier: 1, offset: 0.0}
+  "кадров в секунду": {category: frequency, multiplier: 1, offset: 0.0}
+  "кВт·ч": {category: energy, multiplier: 3600000, offset: 0.0}
+  "кВт/м3": {category: power_density, multiplier: 1, offset: 0.0}
+  "кг/день": {category: mass_rate, multiplier: 0.001, offset: 0.0}
+  "мг О2/дм3": {category: concentration, multiplier: 1, offset: 0.0}
+  "кг/м3ч": {category: specific_mass_throughput, multiplier: 0.001, offset: 0.0}
+  "Гс": {category: magnetic_induction, multiplier: 0.0001, offset: 0.0}
+  "кВт∙час/т": {category: specific_energy, multiplier: 1, offset: 0.0}
+  "т/м2/сут": {category: specific_throughput, multiplier: 0.0416667, offset: 0.0}
+  "г/100 г": {category: recovery, multiplier: 1, offset: 0.0}
+  "А·м-2": {category: current_density, multiplier: 1, offset: 0.0}
+  "л.с.": {category: power, multiplier: 0.73549875, offset: 0.0}
+  "м3/с": {category: flow_rate, multiplier: 3600, offset: 0.0}
+  "Вт/м·К": {category: thermal_conductivity, multiplier: 1, offset: 0.0}
+  "Па/с": {category: viscosity, multiplier: 1, offset: 0.0}
+  "сПз": {category: viscosity, multiplier: 0.001, offset: 0.0}
+  "mol.%": {category: recovery, multiplier: 1, offset: 0.0}
+  "0C": {category: temperature, multiplier: 1, offset: 0.0}
+  "мкОм·м": {category: electrical_resistivity, multiplier: 1, offset: 0.0}
+  "% к массе": {category: recovery, multiplier: 1, offset: 0.0}
+  "мА∙ч∙г−1": {category: specific_capacity, multiplier: 1, offset: 0.0}
+  "л/г": {category: distribution_coefficient, multiplier: 1, offset: 0.0}
+  "кг/год": {category: mass_rate, multiplier: 2.73973e-06, offset: 0.0}
+  "Moz": {category: mass, multiplier: 31103476.8, offset: 0.0}
+  "$/bbl": {category: economic_usd_per_barrel, multiplier: 1, offset: 0.0}
+  "МВ·А": {category: apparent_power, multiplier: 1, offset: 0.0}
+  "м²/мес": {category: area_rate, multiplier: 1, offset: 0.0}
+  "юань/т": {category: economic_cny, multiplier: 1, offset: 0.0}
+  "€/т": {category: economic_eur, multiplier: 1, offset: 0.0}
+  "JPY/г": {category: economic_jpy, multiplier: 1, offset: 0.0}
+  "$/барр": {category: economic_usd_per_barrel, multiplier: 1, offset: 0.0}
+  "$/т·сут": {category: economic_usd_per_tonne_day, multiplier: 1, offset: 0.0}
+  "Дж/м²": {category: energy_per_area, multiplier: 1, offset: 0.0}
+  "¢/кВт·ч": {category: energy_price_usd, multiplier: 1, offset: 0.0}
+  "кг/(м²·цикл)": {category: filtration_productivity, multiplier: 1, offset: 0.0}
+  "%/год": {category: growth_rate, multiplier: 1, offset: 0.0}
+  "°C/мин": {category: heating_rate, multiplier: 1, offset: 0.0}
+  "м²/с": {category: kinematic_viscosity, multiplier: 1, offset: 0.0}
+  "чел·ч/т": {category: labor_intensity, multiplier: 1, offset: 0.0}
+  "г/(м²·ч)": {category: mass_flux, multiplier: 1, offset: 0.0}
+  "т/МВт": {category: mass_per_power, multiplier: 1, offset: 0.0}
+  "млн RMB": {category: money_cny, multiplier: 1, offset: 0.0}
+  "млн GBP": {category: money_gbp, multiplier: 1, offset: 0.0}
+  "мм⁻³": {category: number_density, multiplier: 1, offset: 0.0}
+  "кг/чел": {category: per_capita_mass, multiplier: 1, offset: 0.0}
+  "кг/чел/год": {category: per_capita_mass_rate, multiplier: 1, offset: 0.0}
+  "кВт/м³": {category: power_density, multiplier: 1, offset: 0.0}
+  "г/кВт·ч": {category: specific_emission, multiplier: 1, offset: 0.0}
+  "м³/(м³·ч)": {category: specific_flow_per_volume, multiplier: 1, offset: 0.0}
+  "т/(м³·ч)": {category: specific_mass_throughput, multiplier: 1, offset: 0.0}
+  "м²/кг": {category: specific_surface, multiplier: 1, offset: 0.0}
+  "т/(ч·м²)": {category: specific_throughput, multiplier: 1, offset: 0.0}
+  "м³/т": {category: specific_volume_consumption, multiplier: 1, offset: 0.0}
+  "м²/(м²·с)": {category: surface_area_flux, multiplier: 1, offset: 0.0}
+  "кг/м²": {category: surface_density, multiplier: 1, offset: 0.0}
+  "мВт/см²": {category: surface_power_density, multiplier: 1, offset: 0.0}
+  "Вт/(м·К)": {category: thermal_conductivity, multiplier: 1, offset: 0.0}
+  "МДж/м³": {category: volumetric_energy_density, multiplier: 1, offset: 0.0}
+  "МДж/(м³·К)": {category: volumetric_heat_capacity, multiplier: 1, offset: 0.0}
