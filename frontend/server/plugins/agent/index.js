@@ -128,6 +128,9 @@ module.exports = {
 
           for (const part of parts) {
             if (!part.trim()) continue;
+            if (part.includes("event: subgraph")) {
+              ctx.log(`SSE: subgraph event passing through`);
+            }
             const msg = part + "\n\n";
             const len = Buffer.byteLength(msg).toString(16);
             res.socket.write(`${len}\r\n${msg}\r\n`);
