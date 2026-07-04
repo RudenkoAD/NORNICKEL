@@ -38,7 +38,7 @@ log = logging.getLogger(__name__)
 # Сколько лучших чанков документа возвращать в best_chunks (§5.2 — контекст для синтеза).
 _MAX_BEST_CHUNKS = 3
 # Длина текста чанка в выдаче (обрезаем — синтезу нужен ориентир, не весь чанк).
-_CHUNK_SNIPPET_CHARS = 600
+_CHUNK_SNIPPET_CHARS = 1500  # 04.07: до трёх term-aware окон — числа из глубины журналов
 
 
 def _cite_key(authors: Optional[list[str]], year: Optional[int]) -> str:
@@ -228,9 +228,17 @@ async def run(
 
     chunk_texts: dict[str, str] = {}
     if wanted_chunk_ids:
+        # 04.07 (оценка экспертных вопросов): срез головы чанка прятал найденное —
+        # у bridge-документов чанк = весь журнал, BM25 находил термин на позиции
+        # 90К, а синтез получал первые N символов шапки. Теперь фрагмент — окна
+        # вокруг вхождений токенов запроса (фолбэк — голова, если совпадений нет).
+        q_tokens = [tok.lower() for tok in
+                    re.findall(r"[0-9A-Za-zА-Яа-яЁё]{4,}",
+                               f"{query_text_ru} {query_text_en}")
+                    if tok.lower() not in _STOP_TOKENS][:16]
         for r in db.read(CHUNKS_TEXT, {"chunk_ids": wanted_chunk_ids}):
-            text = (r.get("text") or "")[:_CHUNK_SNIPPET_CHARS]
-            chunk_texts[r["chunk_id"]] = text
+            chunk_texts[r["chunk_id"]] = _smart_snippet(
+                r.get("text") or "", q_tokens, _CHUNK_SNIPPET_CHARS)
 
     results: list[dict[str, Any]] = []
     for doc_id in ranked:
@@ -280,3 +288,40 @@ def _lucene_query(*texts: str) -> str:
             toks.append(low)
     toks = toks[:16]
     return " OR ".join(_LUCENE_ESCAPE_RE.sub(r"\\\1", t) for t in toks)
+
+
+def _smart_snippet(text: str, tokens: list[str], budget: int) -> str:
+    """Окна ±600 симв. вокруг первых вхождений токенов запроса, суммарно ≤budget.
+
+    Пересекающиеся окна сливаются; нет совпадений — голова текста (прежнее
+    поведение, корректно для коротких чанков и заголовков).
+    """
+    if len(text) <= budget:
+        return text
+    tl = text.lower()
+    spans: list[tuple[int, int]] = []
+    half = 600
+    for tok in tokens:
+        pos = tl.find(tok)
+        if pos < 0:
+            continue
+        lo, hi = max(0, pos - half), min(len(text), pos + len(tok) + half)
+        for i, (slo, shi) in enumerate(spans):
+            if lo <= shi and hi >= slo:
+                spans[i] = (min(lo, slo), max(hi, shi))
+                break
+        else:
+            spans.append((lo, hi))
+        if sum(hi - lo for lo, hi in spans) >= budget:
+            break
+    if not spans:
+        return text[:budget]
+    spans.sort()
+    out, used = [], 0
+    for lo, hi in spans:
+        take = min(hi - lo, budget - used)
+        if take <= 0:
+            break
+        out.append(text[lo:lo + take])
+        used += take
+    return "\n[...]\n".join(out)
