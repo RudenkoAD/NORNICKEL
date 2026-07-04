@@ -96,7 +96,12 @@
       margin-top: 16px;
       font-size: 13px;
       color: #888;
+      background: rgba(124, 58, 237, 0.08);
+      border: 1px solid rgba(124, 58, 237, 0.2);
+      border-radius: 8px;
+      padding: 10px 14px;
     }
+    .setup-note b { color: #a78bfa; }
   </style>
 </head>
 <body>
@@ -121,8 +126,8 @@
       </div>
       <button type="submit" class="btn" id="submitBtn">Sign In</button>
     </form>
-    <div class="setup-note" id="setupNote" style="display:none">
-      First time? An admin account will be created.
+    <div class="setup-note" id="demoHint">
+      Demo: <b>admin</b> / <b>writer</b> / <b>reader</b> &mdash; password <b>321321</b>
     </div>
   </div>
 

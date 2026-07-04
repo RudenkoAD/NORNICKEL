@@ -1,6 +1,6 @@
 const auth = require("./auth");
 const obCli = require("./ob-cli");
-const { sanitizeError } = require("../../../core");
+const { sanitizeError } = require("../../core");
 
 function mountRoutes(router, plugin) {
   router.get("/status", (req, res) => {

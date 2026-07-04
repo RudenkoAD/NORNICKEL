@@ -1,0 +1,20 @@
+{
+  "admin": {
+    "username": "admin",
+    "passwordHash": "$2b$10$/SFUS31SY3LrniFp6BZ41e6CXDF5zZLWJCXdbV5MN2vc7yipzQfQC",
+    "role": "admin",
+    "createdAt": "2026-07-04T14:17:15.517Z"
+  },
+  "writer": {
+    "username": "writer",
+    "passwordHash": "$2b$10$/SFUS31SY3LrniFp6BZ41e6CXDF5zZLWJCXdbV5MN2vc7yipzQfQC",
+    "role": "editor",
+    "createdAt": "2026-07-04T14:17:15.519Z"
+  },
+  "reader": {
+    "username": "reader",
+    "passwordHash": "$2b$10$/SFUS31SY3LrniFp6BZ41e6CXDF5zZLWJCXdbV5MN2vc7yipzQfQC",
+    "role": "reader",
+    "createdAt": "2026-07-04T14:17:15.520Z"
+  }
+}

@@ -268,19 +268,24 @@ const server = app.listen(config.port, async () => {
     .warmUp()
     .catch((e) => console.warn("[bootstrap] warm-up error:", e.message));
 
-  // Seed default admin user if configured
-  const seedUsername = process.env.SEED_ADMIN_USERNAME;
-  const seedPassword = process.env.SEED_ADMIN_PASSWORD;
+  // Seed default users for hackathon MVP
+  const seedPassword = process.env.SEED_PASSWORD || "321321";
 
-  if (seedUsername && seedPassword) {
-    const { hash: hashPassword } = require("./auth/password");
-    const { hasAnyUsers, createUser } = require("./auth/store");
+  const { hash: hashPassword } = require("./auth/password");
+  const { hasAnyUsers, createUser } = require("./auth/store");
 
-    if (!hasAnyUsers()) {
-      const passwordHash = await hashPassword(seedPassword);
-      createUser(seedUsername, passwordHash, "admin");
-      console.log(`[ignis] Seeded admin user: ${seedUsername}`);
+  if (!hasAnyUsers()) {
+    const passwordHash = await hashPassword(seedPassword);
+
+    for (const [username, role] of [
+      ["admin", "admin"],
+      ["writer", "editor"],
+      ["reader", "reader"],
+    ]) {
+      createUser(username, passwordHash, role);
     }
+
+    console.log("[ignis] Seeded users: admin, writer, reader (password: 321321)");
   }
 });
 

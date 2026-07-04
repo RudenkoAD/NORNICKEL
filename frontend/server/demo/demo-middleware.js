@@ -18,7 +18,7 @@ const {
   touchSession,
 } = require("./demo-sessions");
 const { ensureDefaultVault } = require("./demo-provision");
-const { sanitizeError } = require("../../core");
+const { sanitizeError } = require("../core");
 
 const ALLOWED_PROXY_HOSTS = new Set([
   "releases.obsidian.md",
