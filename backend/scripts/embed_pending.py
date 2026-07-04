@@ -52,8 +52,11 @@ async def _embed_one(client: Neo4jClient, label: str, key: str, row: dict) -> bo
     try:
         vec = await emb.embed_doc(row["text"])  # patient-профиль внутри (§4)
     except LLMError as err:
-        if "429" in str(err):
-            return False  # квота — прерываем проход, ждём следующего раунда
+        msg = str(err)
+        if "429" in msg or "403" in msg or "Permission" in msg:
+            # 429 = квота-окно; 403 = ключ мёртв/лимит (04.07) — в обоих случаях
+            # долбить дальше бессмысленно: прерываем проход, ждём следующего раунда.
+            return False
         print(f"  SKIP {label} {row['key']}: {err}", file=sys.stderr)
         return True  # не-квотная ошибка (пустой текст и т.п.) — идём дальше
     await asyncio.to_thread(
