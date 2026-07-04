@@ -4,9 +4,10 @@ const crypto = require("crypto");
 const { verify: verifyToken } = require("../../auth/token");
 const { extractToken } = require("../../auth/middleware");
 
-const AGENT_BACKEND = process.env.AGENT_API_URL || "http://localhost:8000/api/query";
+const AGENT_BACKEND = process.env.AGENT_API_URL
+  ? process.env.AGENT_API_URL
+  : "http://localhost:8000/query";
 const AGENT_API_KEY = process.env.AGENT_API_KEY || "";
-const MOCK_ONLY = process.env.AGENT_MOCK === "true" || !process.env.AGENT_API_URL;
 
 function generateId() {
   return crypto.randomUUID();
@@ -34,93 +35,9 @@ function requireAuth(req, res) {
   return payload;
 }
 
-// --- Mocks ---
-
-const MOCK_RESPONSES = {
-  heat: {
-    query: "",
-    answer:
-      "Найдено 2 исследования по термообработке Ni-Al сплавов. Оптимальная твёрдость достигается при 900°C, при 1000°C происходит рост зерна и снижение твёрдости.",
-    entities: [
-      { id: "mat_ni_al", type: "material", name: "Ni-6Al сплав", attributes: { composition: "6 wt% Al, balance Ni" }, docRefs: ["ni_al_heat_treatment"] },
-      { id: "eq_vf1200", type: "equipment", name: "Вакуумная печь VF-1200", attributes: { max_temp: "1200°C" }, docRefs: ["ni_al_heat_treatment"] },
-    ],
-    relations: [{ from: "mat_ni_al", to: "eq_vf1200", type: "tested_in", evidence: "ni_al_heat_treatment" }],
-    sources: [
-      { doc_id: "ni_al_heat_treatment", title: "Ni-Al Alloy Heat Treatment Study (2023)", path: "corpus/ni_al_heat_treatment.md", excerpt: "Optimal hardness achieved at 900°C. At 1000°C, grain growth reduces hardness...", page: null, section: "Conclusion", quote: "Optimal hardness achieved at 900°C" },
-    ],
-    gaps: [{ description: "Нет данных о влиянии скорости охлаждения на твёрдость Ni-Al при температурах > 850°C", relatedEntities: ["mat_ni_al"] }],
-  },
-  corrosion: {
-    query: "",
-    answer: "По коррозионной стойкости Ti-6Al-4V найдено одно исследование в 3.5% NaCl. Скорость коррозии сильно зависит от температуры: 0.012 мм/год при 25°C против 0.045 мм/год при 60°C.",
-    entities: [
-      { id: "mat_ti64", type: "material", name: "Ti-6Al-4V", attributes: { surface: "Polished Ra 0.2 µm" }, docRefs: ["ti_corrosion_test"] },
-    ],
-    relations: [],
-    sources: [
-      { doc_id: "ti_corrosion_test", title: "Ti Alloy Corrosion Resistance Experiment", path: "corpus/ti_corrosion_test.md", excerpt: "Corrosion rate at 25°C: 0.012 mm/year. Corrosion rate at 60°C: 0.045 mm/year.", page: null, section: "Results", quote: "Corrosion rate at 25°C: 0.012 mm/year" },
-    ],
-    gaps: [{ description: "Рекомендуются дополнительные тесты при 40°C и 50°C для уточнения температурной зависимости", relatedEntities: ["mat_ti64"] }],
-  },
-  flotation: {
-    query: "",
-    answer: "По флотации сульфидной Ni-Cu руды найдено одно исследование влияния дозировки собирателя PAX. Оптимальный расход — 40 г/т, извлечение никеля 85.1%.",
-    entities: [
-      { id: "reagent_pax", type: "material", name: "PAX (собиратель)", attributes: { type: "potassium amyl xanthate" }, docRefs: ["flotation_reagent_study"] },
-      { id: "eq_denver", type: "equipment", name: "Denver D12 флотомашина", attributes: { cell_volume: "2L" }, docRefs: ["flotation_reagent_study"] },
-    ],
-    relations: [{ from: "reagent_pax", to: "eq_denver", type: "used_in", evidence: "flotation_reagent_study" }],
-    sources: [
-      { doc_id: "flotation_reagent_study", title: "Flotation Reagent Study: Sulfide Ni-Cu Ore", path: "corpus/flotation_reagent_study.md", excerpt: "40 g/t PAX is the optimal dosage. At 60 g/t, recovery gain is marginal while selectivity decreases.", page: null, section: "Conclusion", quote: "40 g/t PAX is the optimal dosage" },
-    ],
-    gaps: [{ description: "Нет данных по влиянию pH на эффективность PAX при дозировках > 40 г/т", relatedEntities: ["reagent_pax"] }],
-  },
-  multi: {
-    query: "",
-    answer: "По запросу найдено 3 исследования: термообработка Ni-Al, коррозия Ti-6Al-4V и флотация Ni-Cu руды. Ниже представлены все найденные источники и связи.",
-    entities: [
-      { id: "mat_ni_al", type: "material", name: "Ni-6Al сплав", attributes: { composition: "6 wt% Al, balance Ni" }, docRefs: ["ni_al_heat_treatment"] },
-      { id: "mat_ti64", type: "material", name: "Ti-6Al-4V", attributes: { surface: "Polished Ra 0.2 µm" }, docRefs: ["ti_corrosion_test"] },
-      { id: "reagent_pax", type: "material", name: "PAX (собиратель)", attributes: { type: "potassium amyl xanthate" }, docRefs: ["flotation_reagent_study"] },
-      { id: "eq_vf1200", type: "equipment", name: "Вакуумная печь VF-1200", attributes: { max_temp: "1200°C" }, docRefs: ["ni_al_heat_treatment"] },
-      { id: "eq_denver", type: "equipment", name: "Denver D12 флотомашина", attributes: { cell_volume: "2L" }, docRefs: ["flotation_reagent_study"] },
-    ],
-    relations: [
-      { from: "mat_ni_al", to: "eq_vf1200", type: "tested_in", evidence: "ni_al_heat_treatment" },
-      { from: "reagent_pax", to: "eq_denver", type: "used_in", evidence: "flotation_reagent_study" },
-    ],
-    sources: [
-      { doc_id: "ni_al_heat_treatment", title: "Ni-Al Alloy Heat Treatment Study (2023)", path: "corpus/ni_al_heat_treatment.md", excerpt: "Optimal hardness achieved at 900°C. At 1000°C, grain growth reduces hardness...", page: null, section: "Conclusion", quote: "Optimal hardness achieved at 900°C" },
-      { doc_id: "ti_corrosion_test", title: "Ti Alloy Corrosion Resistance Experiment", path: "corpus/ti_corrosion_test.md", excerpt: "Corrosion rate at 25°C: 0.012 mm/year. Corrosion rate at 60°C: 0.045 mm/year.", page: null, section: "Results", quote: "Corrosion rate at 25°C: 0.012 mm/year" },
-      { doc_id: "flotation_reagent_study", title: "Flotation Reagent Study: Sulfide Ni-Cu Ore", path: "corpus/flotation_reagent_study.md", excerpt: "40 g/t PAX is the optimal dosage. At 60 g/t, recovery gain is marginal.", page: null, section: "Conclusion", quote: "40 g/t PAX is the optimal dosage" },
-    ],
-    gaps: [
-      { description: "Нет данных о влиянии скорости охлаждения на твёрдость Ni-Al при T > 850°C", relatedEntities: ["mat_ni_al"] },
-      { description: "Рекомендуются тесты при 40°C и 50°C для Ti-6Al-4V", relatedEntities: ["mat_ti64"] },
-      { description: "Нет данных по влиянию pH на эффективность PAX при дозировках > 40 г/т", relatedEntities: ["reagent_pax"] },
-    ],
-  },
-};
-
-const MOCK_KEYS = Object.keys(MOCK_RESPONSES);
-
-function hashQuery(query) {
-  let hash = 0;
-  for (let i = 0; i < query.length; i++) {
-    hash = ((hash << 5) - hash + query.charCodeAt(i)) | 0;
-  }
-  return Math.abs(hash);
+function sendSSE(res, event, data) {
+  res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
 }
-
-function getMockResponse(query) {
-  const index = hashQuery(query) % MOCK_KEYS.length;
-  const response = JSON.parse(JSON.stringify(MOCK_RESPONSES[MOCK_KEYS[index]]));
-  response.query = query;
-  return response;
-}
-
-// --- Plugin ---
 
 module.exports = {
   id: "agent",
@@ -133,6 +50,39 @@ module.exports = {
   async register(ctx) {
     const dataDir = ctx.dataDir;
 
+    // --- SSE streaming test ---
+    ctx.router.get("/__sse_test", (req, res) => {
+      const tokens = ["T1 ", "T2 ", "T3 ", "T4 ", "T5 ", "T6 ", "T7 ", "T8 ", "T9 ", "T10"];
+
+      // Write headers manually via socket to bypass Express buffering
+      res.socket.write(
+        "HTTP/1.1 200 OK\r\n" +
+        "Content-Type: text/event-stream\r\n" +
+        "Cache-Control: no-cache\r\n" +
+        "Connection: keep-alive\r\n" +
+        "\r\n"
+      );
+      res.socket.setNoDelay(true);
+
+      function sse(event, data) {
+        res.socket.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+      }
+
+      sse("plan", { intent: "test" });
+      let i = 0;
+      function sendNext() {
+        if (i < tokens.length) {
+          sse("token", tokens[i]);
+          i++;
+          setTimeout(sendNext, 200);
+        } else {
+          sse("done", {});
+          res.socket.end();
+        }
+      }
+      sendNext();
+    });
+
     // --- Query ---
 
     ctx.router.post("/query", async (req, res) => {
@@ -144,13 +94,25 @@ module.exports = {
         return res.status(400).json({ error: "Missing query" });
       }
 
-      if (MOCK_ONLY) {
-        ctx.log(`Mock response for ${payload.username}: "${query.slice(0, 50)}"`);
-        await new Promise((r) => setTimeout(r, 400 + Math.random() * 400));
-        return res.json(getMockResponse(query));
-      }
+      ctx.log(`Query from ${payload.username}: "${query.slice(0, 80)}"`);
 
-      ctx.log(`Proxying query to agent backend for: ${payload.username}`);
+      // Write HTTP response headers directly to socket to bypass all buffering
+      res.socket.write(
+        "HTTP/1.1 200 OK\r\n" +
+        "Content-Type: text/event-stream\r\n" +
+        "Cache-Control: no-cache\r\n" +
+        "Connection: keep-alive\r\n" +
+        "X-Accel-Buffering: no\r\n" +
+        "Transfer-Encoding: chunked\r\n" +
+        "\r\n"
+      );
+      res.socket.setNoDelay(true);
+
+      const emit = (event, data) => {
+        const msg = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+        const len = Buffer.byteLength(msg).toString(16);
+        res.socket.write(`${len}\r\n${msg}\r\n`);
+      };
 
       const headers = { "Content-Type": "application/json" };
       if (AGENT_API_KEY) {
@@ -165,47 +127,56 @@ module.exports = {
           body: JSON.stringify({ question: query, stream: true }),
         });
       } catch (err) {
-        ctx.log(`Agent backend unreachable: ${err.message}, falling back to mock`);
-        return res.json(getMockResponse(query));
-      }
-
-      if (!upstream.ok) {
-        ctx.log(`Agent backend returned ${upstream.status}, falling back to mock`);
-        return res.json(getMockResponse(query));
-      }
-
-      // SSE pass-through
-      const ct = upstream.headers.get("content-type") || "";
-      if (ct.includes("text/event-stream")) {
-        res.writeHead(200, {
-          "Content-Type": "text/event-stream",
-          "Cache-Control": "no-cache",
-          Connection: "keep-alive",
-        });
-
-        try {
-          const reader = upstream.body.getReader();
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            res.write(value);
-          }
-        } catch (err) {
-          ctx.log(`SSE stream error: ${err.message}`);
-          res.write(`event: error\ndata: {"event":"error","data":"${err.message}"}\n\n`);
-        }
-        res.end();
+        ctx.log(`Backend unreachable: ${err.message}`);
+        emit("error", { message: `Backend unreachable: ${err.message}` });
+        emit("done", {});
+        res.socket.end("0\r\n\r\n");
         return;
       }
 
-      // Non-streaming fallback
-      try {
-        const data = await upstream.json();
-        res.json(data);
-      } catch (err) {
-        ctx.log(`Agent response parse error: ${err.message}`);
-        return res.json(getMockResponse(query));
+      if (!upstream.ok) {
+        ctx.log(`Backend returned ${upstream.status}`);
+        let body = "";
+        try { body = await upstream.text(); } catch {}
+        emit("error", { message: `Backend error (${upstream.status}): ${body.slice(0, 500)}` });
+        emit("done", {});
+        res.socket.end("0\r\n\r\n");
+        return;
       }
+
+      ctx.log(`Connected to backend, streaming...`);
+
+      try {
+        const reader = upstream.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buf += decoder.decode(value, { stream: true });
+          const parts = buf.split("\n\n");
+          buf = parts.pop();
+
+          for (const part of parts) {
+            if (!part.trim()) continue;
+            const msg = part + "\n\n";
+            const len = Buffer.byteLength(msg).toString(16);
+            res.socket.write(`${len}\r\n${msg}\r\n`);
+          }
+        }
+
+        if (buf.trim()) {
+          const len = Buffer.byteLength(buf).toString(16);
+          res.socket.write(`${len}\r\n${buf}\r\n`);
+        }
+      } catch (err) {
+        ctx.log(`SSE stream error: ${err.message}`);
+        emit("error", { message: `Stream interrupted: ${err.message}` });
+      }
+
+      res.socket.end("0\r\n\r\n");
     });
 
     // --- Sessions ---
@@ -314,7 +285,7 @@ module.exports = {
       }
     });
 
-    ctx.log("Session management ready");
+    ctx.log("Agent plugin ready");
   },
 
   async shutdown() {},

@@ -21879,6 +21879,7 @@ Current: ${query}` : query;
                   const html = `<div class="agent-block agent-block--answer">${parseMarkdown(answerText)}<span class="agent-cursor">|</span></div>`;
                   const rest = messages.slice(0, -1);
                   $$invalidate(1, messages = [...rest, { role: "agent", content: answerText, html }]);
+                  await new Promise((r) => setTimeout(r, 0));
                   break;
                 }
                 case "citations":

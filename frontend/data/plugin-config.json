@@ -1,7 +1,8 @@
 {
   "agent": {
     "enabledVaults": [
-      "Corpus"
+      "Corpus",
+      "My Vault"
     ]
   }
 }

@@ -56,7 +56,10 @@ app.use((req, res, next) => {
 });
 
 app.use(express.json({ limit: settings.MAX_BODY_BACKSTOP }));
-app.use(compression());
+app.use(compression({ filter: (req, res) => {
+  if (req.path.startsWith("/api/ext/agent")) return false;
+  return compression.filter(req, res);
+} }));
 
 // logger middleware
 app.use((req, res, next) => {
