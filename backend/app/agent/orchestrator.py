@@ -180,6 +180,72 @@ def _node_keys_from_plan(plan: dict[str, Any], docs: list[dict[str, Any]]) -> li
     return keys
 
 
+def _build_sources(graph: dict[str, Any], docs: Optional[list[dict]] = None,
+                   answer_md: str = "") -> list[dict[str, Any]]:
+    """Источники-файлы для UI (04.07): уникальные документы провенанса подграфа.
+
+    Каждый — {doc_id, title, path (corpus-относительный, открывается в vault
+    «Corpus»), quote (первая цитата — плагин прокручивает к ней с подсветкой)}.
+    Подграф уже пост-фильтрован по роли (§7) — непубличного здесь нет.
+    """
+    # Только документы, из которых взяты ФАКТЫ ответа (клеймы/условия/продукты) —
+    # сбор со всех рёбер тянул MENTIONED_IN-окрестности подграфа: 20 файлов мусора
+    # вместо ~6 профильных (04.07, регресс после перехода на событие sources).
+    _FACT_TYPES = {"HAS_CONDITION", "PRODUCES", "USES_MATERIAL", "USED_EQUIPMENT",
+                   "STUDIES", "EXPERT_IN", "CONTRADICTS", "SUPPORTED_BY"}
+    fact_quotes: dict[str, str] = {}
+    for e in graph.get("edges", []):
+        if e.get("type") not in _FACT_TYPES:
+            continue
+        p = e.get("props") or {}
+        did = p.get("source_doc_id")
+        if did and str(did) not in fact_quotes:
+            fact_quotes[str(did)] = str(p.get("quote") or "")
+    # Порядок кандидатов: СНАЧАЛА топ семантики (их цитирует синтез — факт-рёбер
+    # в большом подграфе бывает >30 и они выталкивали семантику за кап, 04.07),
+    # затем документы фактов; цитата подтягивается из факт-ребра того же дока.
+    per_doc: dict[str, str] = {}
+    for d in (docs or [])[:10]:
+        did = str(d.get("doc_id") or "")
+        if did:
+            per_doc[did] = fact_quotes.get(did, "")
+    for did, q in fact_quotes.items():
+        if did not in per_doc:
+            per_doc[did] = q
+    if not per_doc:
+        return []
+    per_doc = dict(list(per_doc.items())[:30])
+    try:
+        from app.db.neo4j_client import get_client
+        rows = get_client().read(
+            "MATCH (d:Document) WHERE d.doc_id IN $ids "
+            "RETURN d.doc_id AS doc_id, d.title AS title, d.source_path AS sp, "
+            "d.authors AS authors, d.year AS year",
+            {"ids": list(per_doc)[:30]})
+    except Exception as err:  # noqa: BLE001 — источники не валят ответ
+        log.warning("_build_sources: %s", err)
+        return []
+    # «Источники» = в первую очередь то, что РЕАЛЬНО процитировано в ответе
+    # ([cite_key] в тексте) — как видел пользователь до перехода на событие;
+    # добор — факт-документы с цитатой, суммарно ≤8.
+    from app.agent.tools.graph_search import _cite_key
+    out = []
+    for r in rows:
+        sp = (r.get("sp") or "").replace("\\", "/")
+        path = sp.split("/corpus/", 1)[1] if "/corpus/" in sp else ""
+        ck = _cite_key(r.get("authors"), r.get("year"))
+        used = bool(answer_md) and f"[{ck}]" in answer_md
+        out.append({"doc_id": r["doc_id"], "title": r.get("title") or r["doc_id"],
+                    "path": path, "quote": per_doc.get(str(r["doc_id"]), ""),
+                    "cite_key": ck, "used": used})
+    out.sort(key=lambda s: (not s["used"], s["quote"] == "", str(s["title"])))
+    n_used = sum(1 for s in out if s["used"])
+    keep = out[: max(n_used, 8)] if n_used else out[:8]
+    for s in keep:
+        s.pop("used", None)
+    return keep
+
+
 def _merge_citations(docs: list[dict[str, Any]], graph: dict[str, Any]) -> list[str]:
     """CITATIONS (инвариант №6): объединение cite_key семантики И графа, без дублей."""
     cites: list[str] = []
@@ -618,6 +684,10 @@ async def answer_stream(question: str, role: str) -> AsyncIterator[dict]:
 
         yield {"event": "citations", "data": citations}
         yield {"event": "subgraph", "data": subgraph}
+        # 04.07 (запрос фронта): источники-ФАЙЛЫ с цитатой для открытия на месте —
+        # собираются здесь (единый источник правды), UI их чисто рендерит без
+        # пост-запросов из браузера. RBAC уже применён: подграф отфильтрован по роли.
+        yield {"event": "sources", "data": _build_sources(graph, docs, "".join(answer_parts))}
 
         query_id = _cache_result(question, "".join(answer_parts), citations, subgraph)
         yield {"event": "done", "data": {"query_id": query_id}}
