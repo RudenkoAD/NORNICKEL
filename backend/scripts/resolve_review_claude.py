@@ -50,7 +50,7 @@ def export(out_dir: Path, retry: bool) -> int:
     if not client.wait_until_ready(timeout_s=30):
         print("Neo4j недоступен", file=sys.stderr)
         return 1
-    rows = client.read(_FETCH, {"retry": retry})
+    rows = client.read(_FETCH, {"retry": retry, "doc_id": None})
     doc_texts = load_doc_texts(client, {r["doc_id"] for r in rows})
     client.close()
 
@@ -91,7 +91,7 @@ def apply_proposals(path: Path, dry: bool) -> int:
 
     # retry=True: fuzzy-проход уже пометил всех resolve_attempted — скоуп и так
     # ограничен eid-ами из файла предложений.
-    rows = client.read(_FETCH, {"retry": True})
+    rows = client.read(_FETCH, {"retry": True, "doc_id": None})
     rows = [r for r in rows if r["eid"] in proposals]
     doc_texts = load_doc_texts(client, {r["doc_id"] for r in rows})
 

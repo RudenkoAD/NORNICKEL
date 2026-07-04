@@ -133,6 +133,7 @@ def _append_auto_fixed(current: Optional[str], method: str) -> str:
 _FETCH = """
 MATCH (a)-[r]->(b)
 WHERE r.needs_review = true AND r.source_doc_id IS NOT NULL
+  AND ($doc_id IS NULL OR r.source_doc_id = $doc_id)
   AND ($retry OR coalesce(r.resolve_attempted, false) = false)
   AND coalesce(r.deleted, false) = false
 RETURN elementId(r) AS eid, type(r) AS rtype, r.review_reason AS reason,
@@ -222,13 +223,58 @@ def _matrix_text() -> str:
     )
 
 
+
+_WINDOW_HALF = 800   # символов вокруг якоря
+_WINDOW_MAX = 4      # окон на кандидата
+
+
+def _anchor_windows(row: dict, text: str) -> str:
+    """2-4 окна текста вокруг якорных токенов вместо «головы» документа (04.07).
+
+    Прежний срез doc_text[:12000] писался под чанки Yandex-эры; у Haiku-документов
+    чанк = весь документ (медиана 85 КБ, p90 800 КБ) — цитата чаще всего за
+    пределами головы, и LLM платно промахивалась. Якоря: длинные токены quote,
+    числа value_raw, имена концов. Окна склеены маркером [...], но модель копирует
+    НЕПРЕРЫВНУЮ подстроку, а детерминированная проверка (text.find) идёт по
+    ПОЛНОМУ тексту — склейка ей не видна.
+    """
+    tl = text.lower()
+    anchors: list[str] = []
+    for src in ((row.get("quote") or ""), str(row.get("value_raw") or ""),
+                (row.get("from_name") or ""), (row.get("to_name") or "")):
+        toks = sorted(
+            (tok for tok in _WORD_RE.findall(src.lower())
+             if len(tok) >= 3 or (tok.isdigit() and len(tok) >= 2)),
+            key=len, reverse=True)
+        anchors.extend(toks[:2])
+    spans: list[tuple[int, int]] = []
+    for a in anchors:
+        pos = tl.find(a)
+        if pos < 0:
+            continue
+        lo = max(0, pos - _WINDOW_HALF)
+        hi = min(len(text), pos + len(a) + _WINDOW_HALF)
+        for i, (slo, shi) in enumerate(spans):
+            if lo <= shi and hi >= slo:
+                spans[i] = (min(lo, slo), max(hi, shi))
+                break
+        else:
+            spans.append((lo, hi))
+        if len(spans) >= _WINDOW_MAX:
+            break
+    if not spans:
+        return text[:12000]
+    spans.sort()
+    return "\n[...]\n".join(text[lo:hi] for lo, hi in spans)
+
+
 async def llm_reanchor(llm: YandexLLM, row: dict, doc_text: str) -> Optional[dict]:
     value_part = ""
     if row.get("value_raw"):
         value_part = f" (значение: {row['value_raw']} {row.get('unit_raw') or ''})"
     prompt = _REANCHOR_PROMPT.format(
         from_name=row["from_name"], rtype=row["rtype"], to_name=row["to_name"],
-        value_part=value_part, text=doc_text[:12000],
+        value_part=value_part, text=_anchor_windows(row, doc_text),
     )
     try:
         return await llm.chat_json("Ты — верификатор фактов. Отвечай только JSON.", prompt)
@@ -252,15 +298,17 @@ async def llm_retype(llm: YandexLLM, row: dict) -> Optional[str]:
 # ---------------------------------------------------------------------------
 # Главный конвейер
 # ---------------------------------------------------------------------------
-async def resolve(dry: bool, use_llm: bool, limit: Optional[int], retry: bool = False) -> dict[str, int]:
+async def resolve(dry: bool, use_llm: bool, limit: Optional[int], retry: bool = False,
+                  model: Optional[str] = None, concurrency: int = 8,
+                  doc_id: Optional[str] = None) -> dict[str, int]:
     settings = get_settings()
     client = Neo4jClient(settings)
     if not client.wait_until_ready(timeout_s=30):
         raise RuntimeError("Neo4j недоступен")
     registry = UnitRegistry()
-    llm = YandexLLM(settings, timeout_s=90.0) if use_llm else None
+    llm = YandexLLM(settings, timeout_s=90.0, default_model=model) if use_llm else None
 
-    rows = client.read(_FETCH, {"retry": retry})
+    rows = client.read(_FETCH, {"retry": retry, "doc_id": doc_id})
     if limit:
         rows = rows[:limit]
     doc_texts = load_doc_texts(client, {r["doc_id"] for r in rows})
@@ -268,97 +316,108 @@ async def resolve(dry: bool, use_llm: bool, limit: Optional[int], retry: bool = 
     stats = {"candidates": len(rows), "fuzzy_quote": 0, "llm_quote": 0,
              "llm_value": 0, "retyped": 0, "soft_deleted": 0, "kept": 0}
 
-    for row in rows:
-        reason = row["reason"] or ""
-        text = doc_texts.get(row["doc_id"], "")
-        has_quote_issue = any(m in reason for m in _QUOTE_REASONS)
-        has_number_issue = _NUMBER_REASON in reason
-        has_s33 = _S33_REASON in reason
-        resolved_quote = resolved_numbers = False
-        sets: dict[str, Any] = {}
+    # 04.07: LLM-этапы параллелятся семафором — последовательные 2600 вызовов
+    # шли бы ~2 часа; sync-записи Neo4j коротки и event loop не душат.
+    sem = asyncio.Semaphore(max(1, concurrency))
 
-        # --- Этап A: fuzzy-подмена quote реальной подстрокой ---
-        if has_quote_issue and text:
-            norm_quote = _normalize_ws(row.get("quote") or "")
-            ratio, span = find_best_window(text, norm_quote)
-            if ratio >= FUZZY_THRESHOLD and span:
-                pos = text.find(span)
-                if numbers_ok(row.get("value_raw"), text, pos, len(span)):
-                    sets.update({
-                        "quote": span.strip(), "quote_orig": row.get("quote"),
-                        "auto_fixed": _append_auto_fixed(row.get("auto_fixed"), "quote_fuzzy"),
-                    })
-                    resolved_quote = True
-                    resolved_numbers = has_number_issue  # числа перепроверены в окне
-                    stats["fuzzy_quote"] += 1
+    async def _process_row(row: dict) -> None:
+            reason = row["reason"] or ""
+            text = doc_texts.get(row["doc_id"], "")
+            has_quote_issue = any(m in reason for m in _QUOTE_REASONS)
+            has_number_issue = _NUMBER_REASON in reason
+            has_s33 = _S33_REASON in reason
+            resolved_quote = resolved_numbers = False
+            sets: dict[str, Any] = {}
 
-        # --- Этап B: LLM-переякорение (остатки quote/чисел) ---
-        if use_llm and text and not resolved_quote and (has_quote_issue or has_number_issue):
-            out = await llm_reanchor(llm, row, text)
-            if out and out.get("found") and out.get("quote"):
-                cand = _normalize_ws(str(out["quote"]))
-                pos = text.find(cand)
-                if pos >= 0:  # детерминированная проверка: подстрока реально в тексте
-                    new_value = out.get("value_raw") or row.get("value_raw")
-                    if numbers_ok(new_value, text, pos, len(cand)):
+            # --- Этап A: fuzzy-подмена quote реальной подстрокой ---
+            if has_quote_issue and text:
+                norm_quote = _normalize_ws(row.get("quote") or "")
+                ratio, span = find_best_window(text, norm_quote)
+                if ratio >= FUZZY_THRESHOLD and span:
+                    pos = text.find(span)
+                    if numbers_ok(row.get("value_raw"), text, pos, len(span)):
                         sets.update({
-                            "quote": cand, "quote_orig": row.get("quote"),
-                            "auto_fixed": _append_auto_fixed(
-                                row.get("auto_fixed"),
-                                "value_llm" if str(new_value) != str(row.get("value_raw")) else "quote_llm",
-                            ),
+                            "quote": span.strip(), "quote_orig": row.get("quote"),
+                            "auto_fixed": _append_auto_fixed(row.get("auto_fixed"), "quote_fuzzy"),
                         })
-                        if str(new_value) != str(row.get("value_raw")):
-                            # Пересчёт интервала кодом (§3.1) — LLM только предложила число.
-                            iv = registry.parse_numeric(
-                                str(new_value), out.get("unit_raw") or row.get("unit_raw"),
-                                str(row.get("operator_raw") or "="),
-                            )
-                            if not iv.needs_review:
-                                sets.update({
-                                    "value_raw": new_value,
-                                    "value_min": iv.value_min if math.isfinite(iv.value_min) else None,
-                                    "value_max": iv.value_max if math.isfinite(iv.value_max) else None,
-                                    "unit_canon": iv.unit_canon,
-                                })
-                                stats["llm_value"] += 1
+                        resolved_quote = True
+                        resolved_numbers = has_number_issue  # числа перепроверены в окне
+                        stats["fuzzy_quote"] += 1
+
+            # --- Этап B: LLM-переякорение (остатки quote/чисел) ---
+            if use_llm and text and not resolved_quote and (has_quote_issue or has_number_issue):
+                out = await llm_reanchor(llm, row, text)
+                if out and out.get("found") and out.get("quote"):
+                    cand = _normalize_ws(str(out["quote"]))
+                    pos = text.find(cand)
+                    if pos >= 0:  # детерминированная проверка: подстрока реально в тексте
+                        new_value = out.get("value_raw") or row.get("value_raw")
+                        if numbers_ok(new_value, text, pos, len(cand)):
+                            sets.update({
+                                "quote": cand, "quote_orig": row.get("quote"),
+                                "auto_fixed": _append_auto_fixed(
+                                    row.get("auto_fixed"),
+                                    "value_llm" if str(new_value) != str(row.get("value_raw")) else "quote_llm",
+                                ),
+                            })
+                            if str(new_value) != str(row.get("value_raw")):
+                                # Пересчёт интервала кодом (§3.1) — LLM только предложила число.
+                                iv = registry.parse_numeric(
+                                    str(new_value), out.get("unit_raw") or row.get("unit_raw"),
+                                    str(row.get("operator_raw") or "="),
+                                )
+                                if not iv.needs_review:
+                                    sets.update({
+                                        "value_raw": new_value,
+                                        "value_min": iv.value_min if math.isfinite(iv.value_min) else None,
+                                        "value_max": iv.value_max if math.isfinite(iv.value_max) else None,
+                                        "unit_canon": iv.unit_canon,
+                                    })
+                                    stats["llm_value"] += 1
+                                else:
+                                    sets.pop("quote", None)  # число не подтвердилось — не трогаем
                             else:
-                                sets.pop("quote", None)  # число не подтвердилось — не трогаем
-                        else:
-                            stats["llm_quote"] += 1
-                        if "quote" in sets:
-                            resolved_quote, resolved_numbers = True, True
+                                stats["llm_quote"] += 1
+                            if "quote" in sets:
+                                resolved_quote, resolved_numbers = True, True
 
-        # --- Этап C: перетипизация §3.3 (не-инверсия — инверсию чинит validator) ---
-        if use_llm and has_s33 and not row["rtype"] == "MENTIONED_IN":
-            choice = await llm_retype(llm, row)
-            if choice == "NONE":
-                apply_update(client, row["eid"], {
-                    "deleted": True, "resolve_attempted": True,
-                    "review_reason": (reason + "; LLM: связи нет — мягко удалено"),
-                }, dry)
-                stats["soft_deleted"] += 1
-                continue
-            if choice in _ALLOWED_ENDPOINTS:
-                f_ok, t_ok = _ALLOWED_ENDPOINTS[choice]
-                if row["from_label"] in f_ok and row["to_label"] in t_ok:
-                    retype_edge(client, row, choice, dry)
-                    stats["retyped"] += 1
-                    continue
+            # --- Этап C: перетипизация §3.3 (не-инверсия — инверсию чинит validator) ---
+            if use_llm and has_s33 and not row["rtype"] == "MENTIONED_IN":
+                choice = await llm_retype(llm, row)
+                if choice == "NONE":
+                    apply_update(client, row["eid"], {
+                        "deleted": True, "resolve_attempted": True,
+                        "review_reason": (reason + "; LLM: связи нет — мягко удалено"),
+                    }, dry)
+                    stats["soft_deleted"] += 1
+                    return
+                if choice in _ALLOWED_ENDPOINTS:
+                    f_ok, t_ok = _ALLOWED_ENDPOINTS[choice]
+                    if row["from_label"] in f_ok and row["to_label"] in t_ok:
+                        retype_edge(client, row, choice, dry)
+                        stats["retyped"] += 1
+                        return
 
-        # --- Сборка нового review_reason и запись ---
-        if sets or resolved_quote or resolved_numbers:
-            remaining = strip_reasons(reason, drop_quote=resolved_quote,
-                                      drop_numbers=resolved_numbers)
-            sets["review_reason"] = remaining
-            sets["needs_review"] = remaining is not None
-            sets["resolve_attempted"] = True
-            apply_update(client, row["eid"], sets, dry)
-            if remaining is not None:
+            # --- Сборка нового review_reason и запись ---
+            if sets or resolved_quote or resolved_numbers:
+                remaining = strip_reasons(reason, drop_quote=resolved_quote,
+                                          drop_numbers=resolved_numbers)
+                sets["review_reason"] = remaining
+                sets["needs_review"] = remaining is not None
+                sets["resolve_attempted"] = True
+                apply_update(client, row["eid"], sets, dry)
+                if remaining is not None:
+                    stats["kept"] += 1
+            else:
+                apply_update(client, row["eid"], {"resolve_attempted": True}, dry)
                 stats["kept"] += 1
-        else:
-            apply_update(client, row["eid"], {"resolve_attempted": True}, dry)
-            stats["kept"] += 1
+
+
+    async def _guarded(row: dict) -> None:
+        async with sem:
+            await _process_row(row)
+
+    await asyncio.gather(*(_guarded(r) for r in rows))
 
     client.close()
     return stats
@@ -371,9 +430,15 @@ def main() -> int:
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--retry", action="store_true",
                     help="повторно обработать рёбра с resolve_attempted (после улучшений кода)")
+    ap.add_argument("--model", default=None,
+                    help="модель LLM (напр. openai/gpt-4o-mini через OpenRouter)")
+    ap.add_argument("--concurrency", type=int, default=8)
+    ap.add_argument("--doc-id", default=None, help="скоуп: только рёбра этого документа")
     args = ap.parse_args()
 
-    stats = asyncio.run(resolve(args.dry_run, not args.no_llm, args.limit, retry=args.retry))
+    stats = asyncio.run(resolve(args.dry_run, not args.no_llm, args.limit, retry=args.retry,
+                                model=args.model, concurrency=args.concurrency,
+                                doc_id=args.doc_id))
     print(json.dumps(stats, ensure_ascii=False, indent=1)
           + (" (DRY RUN)" if args.dry_run else ""))
     return 0
