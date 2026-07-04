@@ -19,6 +19,8 @@ const {
   initPlugins,
   shutdownPlugins,
   getBundledPluginDirs,
+  getDiscoveredPlugins,
+  enablePluginForVault,
 } = require("./plugin-system/manager");
 const pluginRoutes = require("./routes/plugins");
 const { authRequired, wsExtractToken } = require("./auth/middleware");
@@ -252,6 +254,18 @@ const server = app.listen(config.port, async () => {
   console.log(`[ignis] Vaults: ${Object.keys(config.vaults).join(", ")}`);
 
   await initPlugins({ app, config, wss, watcher });
+
+  // Auto-enable agent plugin for all vaults
+  const discovered = getDiscoveredPlugins();
+
+  if (discovered.find((p) => p.id === "agent")) {
+    for (const vaultId of Object.keys(config.vaults)) {
+      try {
+        await enablePluginForVault("agent", vaultId);
+      } catch { /* already enabled */ }
+    }
+    console.log("[ignis] Agent plugin auto-enabled for all vaults");
+  }
 
   const bundledPluginDirs = getBundledPluginDirs();
 
