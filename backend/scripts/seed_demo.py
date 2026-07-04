@@ -230,7 +230,13 @@ def _resolve_target(client: Neo4jClient, label: str, cids: list, name_parts: lis
 
 
 def ensure_experiment_edges(client: Neo4jClient, dry_run: bool) -> int:
-    """Рёбра для демо-экспериментов; возвращает число созданных."""
+    """Рёбра для демо-экспериментов; возвращает число созданных.
+
+    ОТКЛЮЧЕНА решением от 04.07 вечера (из main() не вызывается): реальные данные
+    корпуса богаче сидов, и сиды искажали ответы — кейс №2 QA: синтез брал сидовую
+    «оптимальную скорость циркуляции католита 0,5–0,7 м³/ч» вместо реальных
+    20–30 л/ч из doc_1190. Код оставлен для истории/возможного отката.
+    """
     if not dry_run:
         client.write(_ENSURE_CLIMATE_PARAM)
     created = 0
@@ -282,12 +288,13 @@ def main() -> int:
 
         internal = ensure_internal_docs(client, args.internal_count, args.dry_run)
         contradicts = ensure_contradictions(client, args.min_contradicts, args.dry_run)
-        exp_edges = ensure_experiment_edges(client, args.dry_run)
+        # Пересев демо-экспериментов ОТКЛЮЧЁН (решение 04.07 вечера, «удалить все
+        # демо-данные»): сиды искажали ответы на реальном корпусе — см. докстринг
+        # ensure_experiment_edges.
 
         print("\n=== seed_demo — итог ===")
         print(f"internal-документов:  {internal}{' (dry-run)' if args.dry_run else ''}")
         print(f"рёбер CONTRADICTS:    {contradicts}{' (dry-run)' if args.dry_run else ''}")
-        print(f"рёбер демо-экспериментов: {exp_edges}{' (dry-run)' if args.dry_run else ''}")
         print(f"Время: {datetime.now(timezone.utc).isoformat()}")
 
         ok = internal >= args.internal_count and contradicts >= args.min_contradicts
