@@ -29,9 +29,9 @@ OPENAI_EMBEDDING_URL = "https://api.openai.com/v1/embeddings"
 # бюджете $2-5 на корпус (~6М токенов × $0.13/М ≈ $0.8) выбор очевиден.
 # ВАЖНО: модель = сигнатура векторного пространства (emb_space, инвариант №7).
 OPENAI_EMBEDDING_MODEL = "text-embedding-3-large"
-# Каталог OpenRouter эмбеддинг-моделей не содержит (проверено 04.07: 0 из 340) —
-# рабочий путь через прямой OpenAI (OPENAI_API_KEY в .env); OR-ветка оставлена
-# на случай, если их /embeddings-прокси всё же отвечает.
+# У эмбеддингов OpenRouter ОТДЕЛЬНЫЙ каталог /api/v1/embeddings/models (в общем
+# /models их нет — 04.07 это чуть не увело нас на прямой OpenAI); 3-large там
+# есть по той же цене. Прямой OpenAI-маршрут остаётся опцией через OPENAI_API_KEY.
 OPENROUTER_EMBEDDING_MODEL = f"openai/{OPENAI_EMBEDDING_MODEL}"
 
 MODEL_DOC = "doc"
