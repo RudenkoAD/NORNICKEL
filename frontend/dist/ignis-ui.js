@@ -20713,22 +20713,39 @@ ${block.trim()}
     Facility: "equipment",
     Document: "topic"
   };
+  var ENTITY_LIMIT = 30;
+  function rankEntities(entityNodes, edges) {
+    const degree = {};
+    for (const e of edges) {
+      degree[e.from] = (degree[e.from] || 0) + 1;
+      degree[e.to] = (degree[e.to] || 0) + 1;
+    }
+    return entityNodes.map((n) => ({ ...n, _deg: degree[n.key] || 0 })).sort((a2, b) => b._deg - a2._deg || (a2.name || "").localeCompare(b.name || ""));
+  }
   function renderFromBackend(answerText, subgraph, citations, backendSources) {
     let html = "";
     if (answerText) {
       html += `<div class="agent-block agent-block--answer">${parseMarkdown(answerText)}</div>`;
     }
     const nodes = (subgraph == null ? void 0 : subgraph.nodes) || [];
+    const edges = (subgraph == null ? void 0 : subgraph.edges) || [];
     const entityNodes = nodes.filter(
       (n) => n.label !== "Document" && n.label !== "Chunk"
     );
     if (entityNodes.length > 0) {
-      const items = entityNodes.map((n) => {
+      const ranked = rankEntities(entityNodes, edges);
+      const display = ranked.slice(0, ENTITY_LIMIT);
+      const hidden = ranked.length - display.length;
+      const items = display.map((n) => {
         const type2 = LABEL_TO_TYPE[n.label] || "topic";
         return `<span class="agent-entity agent-entity--${type2}">${escapeHtml(n.name || n.key)}</span>`;
       }).join("");
+      let label = `\u0421\u0443\u0449\u043D\u043E\u0441\u0442\u0438 (${display.length}`;
+      if (hidden > 0)
+        label += ` \u0438\u0437 ${ranked.length}`;
+      label += ")";
       html += `<div class="agent-block agent-block--entities">
-      <div class="agent-block-label">\u0421\u0443\u0449\u043D\u043E\u0441\u0442\u0438 (${entityNodes.length})</div>
+      <div class="agent-block-label">${label}</div>
       <div class="agent-entity-list">${items}</div>
     </div>`;
     }

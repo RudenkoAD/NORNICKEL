@@ -11997,7 +11997,7 @@ module.exports = class extends obsidian.Plugin {
   }
 
   // packages/shim/src/loader.js
-  window.__ignis = { version: "0.8.7", build: "r74l9b5" };
+  window.__ignis = { version: "0.8.7", build: "r75324f" };
   window.__ignis_registerUI = registerUI;
   var perms = window.__ignisPermissions;
   if (perms) {
