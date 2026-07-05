@@ -20733,17 +20733,6 @@ ${block.trim()}
       <div class="agent-entity-list">${items}</div>
     </div>`;
     }
-    if (edges.length > 0) {
-      const items = edges.map((e) => {
-        const fromName = escapeHtml(e.from);
-        const toName = escapeHtml(e.to);
-        return `<div class="agent-relation">${fromName} <span class="agent-relation-type">${escapeHtml(e.type)}</span> ${toName}</div>`;
-      }).join("");
-      html += `<div class="agent-block agent-block--relations">
-      <div class="agent-block-label">\u0421\u0432\u044F\u0437\u0438 (${edges.length})</div>
-      <div class="agent-relation-list">${items}</div>
-    </div>`;
-    }
     const sourceMap = /* @__PURE__ */ new Map();
     for (const e of edges) {
       const p = e.props || {};
