@@ -20713,13 +20713,12 @@ ${block.trim()}
     Facility: "equipment",
     Document: "topic"
   };
-  function renderFromBackend(answerText, subgraph, citations) {
+  function renderFromBackend(answerText, subgraph, citations, backendSources) {
     let html = "";
     if (answerText) {
       html += `<div class="agent-block agent-block--answer">${parseMarkdown(answerText)}</div>`;
     }
     const nodes = (subgraph == null ? void 0 : subgraph.nodes) || [];
-    const edges = (subgraph == null ? void 0 : subgraph.edges) || [];
     const entityNodes = nodes.filter(
       (n) => n.label !== "Document" && n.label !== "Chunk"
     );
@@ -20733,37 +20732,11 @@ ${block.trim()}
       <div class="agent-entity-list">${items}</div>
     </div>`;
     }
-    const sourceMap = /* @__PURE__ */ new Map();
-    for (const e of edges) {
-      const p = e.props || {};
-      if (p.source_doc_id && !sourceMap.has(p.source_doc_id)) {
-        sourceMap.set(p.source_doc_id, {
-          doc_id: p.source_doc_id,
-          path: p.document_path || "",
-          excerpt: p.quote || "",
-          quote: p.quote || "",
-          title: p.document_title || p.source_doc_id
-        });
-      }
-    }
-    if (citations && citations.length > 0) {
-      for (const cite of citations) {
-        if (!sourceMap.has(cite)) {
-          sourceMap.set(cite, {
-            doc_id: cite,
-            path: "",
-            excerpt: "",
-            quote: "",
-            title: cite
-          });
-        }
-      }
-    }
-    const sources = Array.from(sourceMap.values());
+    const sources = backendSources || [];
     if (sources.length > 0) {
       const items = sources.map((s) => {
         const link = resolveSourceLink(s);
-        const excerpt = escapeHtml(s.excerpt || "");
+        const excerpt = escapeHtml(s.quote || s.excerpt || "");
         return `<div class="agent-source">
           <div class="agent-source-link">${link}</div>
           ${excerpt ? `<div class="agent-source-excerpt">${excerpt}</div>` : ""}
@@ -21932,6 +21905,7 @@ Current: ${query}` : query;
       let pendingChars = "";
       let citations = [];
       let subgraph = { nodes: [], edges: [] };
+      let backendSources = [];
       let hasError = false;
       let streaming = true;
       $$invalidate(1, messages = [...messages, { role: "agent", content: "", html: "" }]);
@@ -21995,6 +21969,10 @@ Current: ${query}` : query;
                   subgraph = payload && payload.nodes ? payload : { nodes: [], edges: [] };
                   console.log("[agent] subgraph event:", (_a = subgraph.nodes) == null ? void 0 : _a.length, "nodes", (_b = subgraph.edges) == null ? void 0 : _b.length, "edges");
                   break;
+                case "sources":
+                  backendSources = Array.isArray(payload) ? payload : [];
+                  console.log("[agent] sources event:", backendSources.length, "sources");
+                  break;
                 case "done":
                   console.log("[agent] done event:", payload);
                   break;
@@ -22014,7 +21992,7 @@ Current: ${query}` : query;
         await new Promise((r) => setTimeout(r, 30));
       }
       if (!hasError) {
-        const html = renderFromBackend(fullAnswer, subgraph, citations);
+        const html = renderFromBackend(fullAnswer, subgraph, citations, backendSources);
         const showGraph2 = subgraph.nodes && subgraph.nodes.length > 0;
         console.log("[agent] final render: nodes=" + subgraph.nodes.length, "edges=" + subgraph.edges.length, "showGraph=" + showGraph2);
         $$invalidate(1, messages = [
