@@ -232,6 +232,13 @@ app.get(["/", "/index.html"], authRequired, (req, res) => {
 });
 
 app.get("/favicon.png", (req, res) => {
+  const f = path.join(REPO_ROOT, "images", "favicon.png");
+  res.setHeader("Cache-Control", "public, max-age=86400");
+  res.sendFile(f);
+});
+
+app.get("/favicon.ico", (req, res) => {
+  res.setHeader("Cache-Control", "public, max-age=86400");
   res.sendFile(path.join(REPO_ROOT, "images", "favicon.png"));
 });
 

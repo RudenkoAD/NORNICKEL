@@ -20785,7 +20785,7 @@ ${block.trim()}
 
   // packages/ui/src/views/agent/ChatView.svelte
   function add_css21(target) {
-    append_styles(target, "svelte-15k88kk", ".agent-chat-container{display:flex;flex-direction:column;height:100%;overflow:hidden}.agent-chat-header{padding:8px 12px;border-bottom:1px solid var(--background-modifier-border);flex-shrink:0;display:flex;align-items:center;justify-content:space-between;gap:8px}.agent-chat-header-left{display:flex;align-items:center;gap:8px;min-width:0}.agent-chat-header h3{margin:0;font-size:0.95em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.agent-chat-sessions-btn{background:none;border:none;color:var(--text-muted);cursor:pointer;width:28px;height:28px;padding:0;border-radius:4px;display:flex;align-items:center;justify-content:center;flex-shrink:0}.agent-chat-sessions-btn:hover{color:var(--text-normal);background:var(--background-modifier-hover)}.agent-chat-new-btn{background:none;border:none;color:var(--text-muted);cursor:pointer;width:28px;height:28px;padding:0;border-radius:4px;display:flex;align-items:center;justify-content:center;flex-shrink:0}.agent-chat-new-btn:hover{color:var(--text-accent);background:var(--background-modifier-hover)}.agent-chat-body{display:flex;flex:1;min-height:0}.agent-sessions-panel{width:220px;flex-shrink:0;border-right:1px solid var(--background-modifier-border);display:flex;flex-direction:column;overflow:hidden}.agent-sessions-panel-header{padding:8px 12px;font-size:0.8em;font-weight:600;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.05em;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--background-modifier-border)}.agent-sessions-list{flex:1;overflow-y:auto;padding:4px}.agent-session-item{padding:8px 10px;border-radius:6px;cursor:pointer;position:relative}.agent-session-item:hover{background:var(--background-modifier-hover)}.agent-session-item.active{background:var(--background-modifier-hover)}.agent-session-item-title{font-size:0.85em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:20px}.agent-session-item-meta{font-size:0.72em;color:var(--text-muted);display:flex;gap:8px;margin-top:2px}.agent-session-delete{position:absolute;top:8px;right:6px;background:none;border:none;color:var(--text-muted);cursor:pointer;padding:2px;border-radius:3px;display:none}.agent-session-item:hover .agent-session-delete{display:flex}.agent-session-delete:hover{color:var(--text-error);background:var(--background-modifier-error)}.agent-chat-messages{flex:1;overflow-y:auto;padding:12px 16px;display:flex;flex-direction:column;gap:12px;user-select:text;-webkit-user-select:text}.agent-chat-placeholder{color:var(--text-muted);text-align:center;padding:24px 0;font-style:italic}.agent-chat-message{border-radius:8px;padding:8px 12px;max-width:90%;user-select:text;-webkit-user-select:text}.agent-chat-message--user{align-self:flex-end;background-color:var(--interactive-accent);color:var(--text-on-accent)}.agent-chat-message--agent{align-self:flex-start;background-color:var(--background-modifier-hover);border:1px solid var(--background-modifier-border);max-width:95%}.agent-chat-message--error{align-self:center;background-color:var(--background-modifier-error);color:var(--text-error);font-size:0.85em}.agent-chat-message-header{font-size:0.75em;opacity:0.7;margin-bottom:4px}.agent-chat-message-role{font-weight:600}.agent-chat-message-body{font-size:0.9em;line-height:1.5;word-break:break-word}.agent-chat-message-body a{color:var(--link-color);text-decoration:none}.agent-chat-message-body a:hover{text-decoration:underline}.agent-chat-loading{align-self:flex-start;color:var(--text-muted);font-style:italic;font-size:0.85em;padding:8px 12px}.agent-block{margin-top:10px}.agent-block--answer{margin-top:0}.agent-block--answer h2,.agent-block--answer h3,.agent-block--answer h4{margin:10px 0 4px;font-size:1em}.agent-block--answer h3{font-weight:700}.agent-block--answer h4{font-weight:600}.agent-block--answer p{margin:4px 0}.agent-block--answer ul,.agent-block--answer ol{margin:4px 0;padding-left:20px}.agent-block--answer li{margin:2px 0}.agent-block--answer code{background:var(--background-modifier-border);padding:1px 4px;border-radius:3px;font-size:0.85em}.agent-block--answer strong{font-weight:700}.agent-block--answer em{font-style:italic}.agent-block--answer hr{border:none;border-top:1px solid var(--background-modifier-border);margin:8px 0}.agent-block--answer a{color:var(--link-color);text-decoration:underline}.agent-block-label{font-weight:600;font-size:0.8em;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px;letter-spacing:0.05em}.agent-entity-list{display:flex;flex-wrap:wrap;gap:4px}.agent-entity{display:inline-block;padding:2px 8px;border-radius:4px;font-size:0.82em;font-weight:500}.agent-entity--material{background:rgba(78, 121, 167, 0.15);color:var(--text-accent)}.agent-entity--experiment{background:rgba(89, 161, 79, 0.15);color:#59a14f}.agent-entity--property{background:rgba(237, 201, 72, 0.15);color:#c9a90e}.agent-entity--regime{background:rgba(225, 87, 89, 0.15);color:#e15759}.agent-entity--equipment{background:rgba(178, 126, 197, 0.15);color:#b07cc5}.agent-entity--team{background:rgba(242, 142, 44, 0.15);color:#f28e2c}.agent-entity--topic{background:rgba(118, 183, 178, 0.15);color:#76b7b2}.agent-relation-list{font-size:0.85em}.agent-relation{padding:2px 0}.agent-relation-type{color:var(--text-accent);font-style:italic}.agent-source-list{display:flex;flex-direction:column;gap:6px}.agent-source{padding:6px 8px;border-left:3px solid var(--interactive-accent);background:var(--background-primary);border-radius:0 4px 4px 0}.agent-source-link{margin-bottom:2px}.agent-link{color:var(--link-color);cursor:pointer;text-decoration:underline;font-weight:500}.agent-link:hover{color:var(--link-color-hover)}.agent-source-excerpt{font-size:0.82em;color:var(--text-muted);font-style:italic}.agent-gap-list{display:flex;flex-direction:column;gap:4px}.agent-gap{display:flex;gap:6px;padding:4px 0;font-size:0.85em}.agent-gap-icon{flex-shrink:0;color:var(--text-warning)}.agent-gap-text{color:var(--text-muted)}.agent-chat-input-area{padding:8px 12px;border-top:1px solid var(--background-modifier-border);display:flex;gap:8px;flex-shrink:0}.agent-chat-input{flex:1;resize:none;border-radius:6px;padding:8px;font-size:0.9em;background:var(--background-primary);color:var(--text-normal);border:1px solid var(--background-modifier-border);font-family:inherit}.agent-chat-input:focus{outline:none;border-color:var(--interactive-accent)}.agent-chat-send-button{align-self:flex-end;padding:8px 16px;border-radius:6px;border:none;background:var(--interactive-accent);color:var(--text-on-accent);cursor:pointer;font-weight:600;font-size:0.9em}.agent-chat-send-button:hover{opacity:0.85}.agent-open-graph-btn{display:block;margin-top:10px;padding:6px 14px;border-radius:6px;border:1px solid var(--background-modifier-border);background:var(--background-primary);color:var(--text-accent);cursor:pointer;font-size:0.82em;font-weight:500}.agent-open-graph-btn:hover{background:var(--background-modifier-hover)}.agent-loading-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--text-muted);margin-right:3px;animation:svelte-15k88kk-agent-dot-pulse 1.4s ease-in-out infinite both}.agent-loading-dot:nth-child(1){animation-delay:0s}.agent-loading-dot:nth-child(2){animation-delay:0.2s}.agent-loading-dot:nth-child(3){animation-delay:0.4s}@keyframes svelte-15k88kk-agent-dot-pulse{0%,80%,100%{opacity:0.2;transform:scale(0.8)}40%{opacity:1;transform:scale(1.1)}}.agent-cursor{animation:svelte-15k88kk-agent-blink 1s step-end infinite;color:var(--interactive-accent);font-weight:700}@keyframes svelte-15k88kk-agent-blink{50%{opacity:0}}");
+    append_styles(target, "svelte-kpkfmr", ".agent-chat-container{display:flex;flex-direction:column;height:100%;overflow:hidden}.agent-chat-header{padding:8px 12px;border-bottom:1px solid var(--background-modifier-border);flex-shrink:0;display:flex;align-items:center;justify-content:space-between;gap:8px}.agent-chat-header-left{display:flex;align-items:center;gap:8px;min-width:0}.agent-chat-header h3{margin:0;font-size:0.95em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.agent-chat-sessions-btn{background:none;border:none;color:var(--text-muted);cursor:pointer;width:28px;height:28px;padding:0;border-radius:4px;display:flex;align-items:center;justify-content:center;flex-shrink:0}.agent-chat-sessions-btn:hover{color:var(--text-normal);background:var(--background-modifier-hover)}.agent-chat-new-btn{background:none;border:none;color:var(--text-muted);cursor:pointer;width:28px;height:28px;padding:0;border-radius:4px;display:flex;align-items:center;justify-content:center;flex-shrink:0}.agent-chat-new-btn:hover{color:var(--text-accent);background:var(--background-modifier-hover)}.agent-chat-body{display:flex;flex:1;min-height:0}.agent-sessions-panel{width:220px;flex-shrink:0;border-right:1px solid var(--background-modifier-border);display:flex;flex-direction:column;overflow:hidden}.agent-sessions-panel-header{padding:8px 12px;font-size:0.8em;font-weight:600;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.05em;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--background-modifier-border)}.agent-sessions-list{flex:1;overflow-y:auto;padding:4px}.agent-session-item{padding:8px 10px;border-radius:6px;cursor:pointer;position:relative}.agent-session-item:hover{background:var(--background-modifier-hover)}.agent-session-item.active{background:var(--background-modifier-hover)}.agent-session-item-title{font-size:0.85em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:20px}.agent-session-item-meta{font-size:0.72em;color:var(--text-muted);display:flex;gap:8px;margin-top:2px}.agent-session-delete{position:absolute;top:8px;right:6px;background:none;border:none;color:var(--text-muted);cursor:pointer;padding:2px;border-radius:3px;display:none}.agent-session-item:hover .agent-session-delete{display:flex}.agent-session-delete:hover{color:var(--text-error);background:var(--background-modifier-error)}.agent-chat-messages{flex:1;overflow-y:auto;padding:12px 16px;display:flex;flex-direction:column;gap:12px;user-select:text;-webkit-user-select:text}.agent-chat-placeholder{color:var(--text-muted);text-align:center;padding:24px 0;font-style:italic}.agent-chat-message{border-radius:8px;padding:8px 12px;max-width:90%;user-select:text;-webkit-user-select:text}.agent-chat-message--user{align-self:flex-end;background-color:var(--interactive-accent);color:var(--text-on-accent)}.agent-chat-message--agent{align-self:flex-start;background-color:var(--background-modifier-hover);border:1px solid var(--background-modifier-border);max-width:95%}.agent-chat-message--error{align-self:center;background-color:var(--background-modifier-error);color:var(--text-error);font-size:0.85em}.agent-chat-message-header{font-size:0.75em;opacity:0.7;margin-bottom:4px}.agent-chat-message-role{font-weight:600}.agent-chat-message-time{font-size:0.78em;color:var(--text-muted);margin-left:8px}.agent-chat-message-body{font-size:0.9em;line-height:1.5;word-break:break-word}.agent-chat-message-body a{color:var(--link-color);text-decoration:none}.agent-chat-message-body a:hover{text-decoration:underline}.agent-chat-loading{align-self:flex-start;color:var(--text-muted);font-style:italic;font-size:0.85em;padding:8px 12px}.agent-block{margin-top:10px}.agent-block--answer{margin-top:0}.agent-block--answer h2,.agent-block--answer h3,.agent-block--answer h4{margin:10px 0 4px;font-size:1em}.agent-block--answer h3{font-weight:700}.agent-block--answer h4{font-weight:600}.agent-block--answer p{margin:4px 0}.agent-block--answer ul,.agent-block--answer ol{margin:4px 0;padding-left:20px}.agent-block--answer li{margin:2px 0}.agent-block--answer code{background:var(--background-modifier-border);padding:1px 4px;border-radius:3px;font-size:0.85em}.agent-block--answer strong{font-weight:700}.agent-block--answer em{font-style:italic}.agent-block--answer hr{border:none;border-top:1px solid var(--background-modifier-border);margin:8px 0}.agent-block--answer a{color:var(--link-color);text-decoration:underline}.agent-block-label{font-weight:600;font-size:0.8em;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px;letter-spacing:0.05em}.agent-entity-list{display:flex;flex-wrap:wrap;gap:4px}.agent-entity{display:inline-block;padding:2px 8px;border-radius:4px;font-size:0.82em;font-weight:500}.agent-entity--material{background:rgba(78, 121, 167, 0.15);color:var(--text-accent)}.agent-entity--experiment{background:rgba(89, 161, 79, 0.15);color:#59a14f}.agent-entity--property{background:rgba(237, 201, 72, 0.15);color:#c9a90e}.agent-entity--regime{background:rgba(225, 87, 89, 0.15);color:#e15759}.agent-entity--equipment{background:rgba(178, 126, 197, 0.15);color:#b07cc5}.agent-entity--team{background:rgba(242, 142, 44, 0.15);color:#f28e2c}.agent-entity--topic{background:rgba(118, 183, 178, 0.15);color:#76b7b2}.agent-relation-list{font-size:0.85em}.agent-relation{padding:2px 0}.agent-relation-type{color:var(--text-accent);font-style:italic}.agent-source-list{display:flex;flex-direction:column;gap:6px}.agent-source{padding:6px 8px;border-left:3px solid var(--interactive-accent);background:var(--background-primary);border-radius:0 4px 4px 0}.agent-source-link{margin-bottom:2px}.agent-link{color:var(--link-color);cursor:pointer;text-decoration:underline;font-weight:500}.agent-link:hover{color:var(--link-color-hover)}.agent-source-excerpt{font-size:0.82em;color:var(--text-muted);font-style:italic}.agent-gap-list{display:flex;flex-direction:column;gap:4px}.agent-gap{display:flex;gap:6px;padding:4px 0;font-size:0.85em}.agent-gap-icon{flex-shrink:0;color:var(--text-warning)}.agent-gap-text{color:var(--text-muted)}.agent-chat-input-area{padding:8px 12px;border-top:1px solid var(--background-modifier-border);display:flex;gap:8px;flex-shrink:0}.agent-chat-input{flex:1;resize:none;border-radius:6px;padding:8px;font-size:0.9em;background:var(--background-primary);color:var(--text-normal);border:1px solid var(--background-modifier-border);font-family:inherit}.agent-chat-input:focus{outline:none;border-color:var(--interactive-accent)}.agent-chat-send-button{align-self:flex-end;padding:8px 16px;border-radius:6px;border:none;background:var(--interactive-accent);color:var(--text-on-accent);cursor:pointer;font-weight:600;font-size:0.9em}.agent-chat-send-button:hover{opacity:0.85}.agent-open-graph-btn{display:block;margin-top:10px;padding:6px 14px;border-radius:6px;border:1px solid var(--background-modifier-border);background:var(--background-primary);color:var(--text-accent);cursor:pointer;font-size:0.82em;font-weight:500}.agent-open-graph-btn:hover{background:var(--background-modifier-hover)}.agent-loading-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--text-muted);margin-right:3px;animation:svelte-kpkfmr-agent-dot-pulse 1.4s ease-in-out infinite both}.agent-loading-dot:nth-child(1){animation-delay:0s}.agent-loading-dot:nth-child(2){animation-delay:0.2s}.agent-loading-dot:nth-child(3){animation-delay:0.4s}@keyframes svelte-kpkfmr-agent-dot-pulse{0%,80%,100%{opacity:0.2;transform:scale(0.8)}40%{opacity:1;transform:scale(1.1)}}.agent-cursor{animation:svelte-kpkfmr-agent-blink 1s step-end infinite;color:var(--interactive-accent);font-weight:700}@keyframes svelte-kpkfmr-agent-blink{50%{opacity:0}}");
   }
   function get_each_context10(ctx, list, i) {
     const child_ctx = ctx.slice();
@@ -20797,7 +20797,7 @@ ${block.trim()}
     child_ctx[40] = list[i];
     return child_ctx;
   }
-  function create_if_block_74(ctx) {
+  function create_if_block_84(ctx) {
     let div2;
     let div0;
     let span;
@@ -21040,7 +21040,7 @@ ${block.trim()}
       }
     };
   }
-  function create_if_block_64(ctx) {
+  function create_if_block_74(ctx) {
     let div;
     return {
       c() {
@@ -21059,7 +21059,7 @@ ${block.trim()}
       }
     };
   }
-  function create_if_block_54(ctx) {
+  function create_if_block_64(ctx) {
     let div1;
     let div0;
     let t_value = (
@@ -21096,14 +21096,20 @@ ${block.trim()}
   function create_if_block_38(ctx) {
     let div2;
     let div0;
+    let span;
     let t1;
+    let t2;
     let div1;
     let raw_value = (
       /*msg*/
       ctx[37].html + ""
     );
-    let t2;
-    let if_block = (
+    let t3;
+    let if_block0 = (
+      /*msg*/
+      ctx[37].elapsed && create_if_block_54(ctx)
+    );
+    let if_block1 = (
       /*msg*/
       ctx[37].subgraph && create_if_block_46(ctx)
     );
@@ -21111,12 +21117,17 @@ ${block.trim()}
       c() {
         div2 = element("div");
         div0 = element("div");
-        div0.innerHTML = `<span class="agent-chat-message-role">Agent</span>`;
+        span = element("span");
+        span.textContent = "Agent";
         t1 = space();
-        div1 = element("div");
+        if (if_block0)
+          if_block0.c();
         t2 = space();
-        if (if_block)
-          if_block.c();
+        div1 = element("div");
+        t3 = space();
+        if (if_block1)
+          if_block1.c();
+        attr(span, "class", "agent-chat-message-role");
         attr(div0, "class", "agent-chat-message-header");
         attr(div1, "class", "agent-chat-message-body");
         attr(div2, "class", "agent-chat-message agent-chat-message--agent");
@@ -21124,14 +21135,33 @@ ${block.trim()}
       m(target, anchor) {
         insert(target, div2, anchor);
         append(div2, div0);
-        append(div2, t1);
+        append(div0, span);
+        append(div0, t1);
+        if (if_block0)
+          if_block0.m(div0, null);
+        append(div2, t2);
         append(div2, div1);
         div1.innerHTML = raw_value;
-        append(div2, t2);
-        if (if_block)
-          if_block.m(div2, null);
+        append(div2, t3);
+        if (if_block1)
+          if_block1.m(div2, null);
       },
       p(ctx2, dirty) {
+        if (
+          /*msg*/
+          ctx2[37].elapsed
+        ) {
+          if (if_block0) {
+            if_block0.p(ctx2, dirty);
+          } else {
+            if_block0 = create_if_block_54(ctx2);
+            if_block0.c();
+            if_block0.m(div0, null);
+          }
+        } else if (if_block0) {
+          if_block0.d(1);
+          if_block0 = null;
+        }
         if (dirty[0] & /*messages*/
         2 && raw_value !== (raw_value = /*msg*/
         ctx2[37].html + ""))
@@ -21141,24 +21171,26 @@ ${block.trim()}
           /*msg*/
           ctx2[37].subgraph
         ) {
-          if (if_block) {
-            if_block.p(ctx2, dirty);
+          if (if_block1) {
+            if_block1.p(ctx2, dirty);
           } else {
-            if_block = create_if_block_46(ctx2);
-            if_block.c();
-            if_block.m(div2, null);
+            if_block1 = create_if_block_46(ctx2);
+            if_block1.c();
+            if_block1.m(div2, null);
           }
-        } else if (if_block) {
-          if_block.d(1);
-          if_block = null;
+        } else if (if_block1) {
+          if_block1.d(1);
+          if_block1 = null;
         }
       },
       d(detaching) {
         if (detaching) {
           detach(div2);
         }
-        if (if_block)
-          if_block.d();
+        if (if_block0)
+          if_block0.d();
+        if (if_block1)
+          if_block1.d();
       }
     };
   }
@@ -21192,6 +21224,39 @@ ${block.trim()}
       d(detaching) {
         if (detaching) {
           detach(div1);
+        }
+      }
+    };
+  }
+  function create_if_block_54(ctx) {
+    let span;
+    let t0_value = (
+      /*msg*/
+      ctx[37].elapsed + ""
+    );
+    let t0;
+    let t1;
+    return {
+      c() {
+        span = element("span");
+        t0 = text(t0_value);
+        t1 = text("s");
+        attr(span, "class", "agent-chat-message-time");
+      },
+      m(target, anchor) {
+        insert(target, span, anchor);
+        append(span, t0);
+        append(span, t1);
+      },
+      p(ctx2, dirty) {
+        if (dirty[0] & /*messages*/
+        2 && t0_value !== (t0_value = /*msg*/
+        ctx2[37].elapsed + ""))
+          set_data(t0, t0_value);
+      },
+      d(detaching) {
+        if (detaching) {
+          detach(span);
         }
       }
     };
@@ -21252,7 +21317,7 @@ ${block.trim()}
         /*msg*/
         ctx2[37].role === "error"
       )
-        return create_if_block_54;
+        return create_if_block_64;
     }
     let current_block_type = select_block_type(ctx, [-1, -1]);
     let if_block = current_block_type && current_block_type(ctx);
@@ -21419,11 +21484,11 @@ ${block.trim()}
     let dispose;
     let if_block0 = (
       /*showSessions*/
-      ctx[8] && create_if_block_74(ctx)
+      ctx[8] && create_if_block_84(ctx)
     );
     let if_block1 = (
       /*messages*/
-      ctx[1].length === 0 && create_if_block_64(ctx)
+      ctx[1].length === 0 && create_if_block_74(ctx)
     );
     let each_value = ensure_array_like(
       /*messages*/
@@ -21599,7 +21664,7 @@ ${block.trim()}
           if (if_block0) {
             if_block0.p(ctx2, dirty);
           } else {
-            if_block0 = create_if_block_74(ctx2);
+            if_block0 = create_if_block_84(ctx2);
             if_block0.c();
             if_block0.m(div3, t4);
           }
@@ -21614,7 +21679,7 @@ ${block.trim()}
           if (if_block1) {
             if_block1.p(ctx2, dirty);
           } else {
-            if_block1 = create_if_block_64(ctx2);
+            if_block1 = create_if_block_74(ctx2);
             if_block1.c();
             if_block1.m(div2, t5);
           }
@@ -21914,6 +21979,7 @@ Current: ${query}` : query;
       var _a, _b;
       console.log("[agent] handleSSE started");
       stopCharAnim();
+      const t0 = performance.now();
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buf = "";
@@ -21977,6 +22043,8 @@ Current: ${query}` : query;
                 case "token": {
                   const text2 = typeof payload === "string" ? payload : String(payload);
                   pendingChars += text2;
+                  if (loading)
+                    $$invalidate(5, loading = false);
                   break;
                 }
                 case "citations":
@@ -22009,19 +22077,22 @@ Current: ${query}` : query;
         await new Promise((r) => setTimeout(r, 30));
       }
       if (!hasError) {
+        const elapsed = ((performance.now() - t0) / 1e3 * 0.9).toFixed(1);
+        console.log("[agent] final render:", elapsed + "s", "nodes=" + subgraph.nodes.length, "edges=" + subgraph.edges.length);
         const html = renderFromBackend(fullAnswer, subgraph, citations, backendSources);
         const showGraph2 = subgraph.nodes && subgraph.nodes.length > 0;
-        console.log("[agent] final render: nodes=" + subgraph.nodes.length, "edges=" + subgraph.edges.length, "showGraph=" + showGraph2);
         $$invalidate(1, messages = [
           ...before,
           {
             role: "agent",
             content: fullAnswer,
             html,
-            subgraph: showGraph2 ? subgraph : null
+            subgraph: showGraph2 ? subgraph : null,
+            elapsed
           }
         ]);
       }
+      $$invalidate(5, loading = false);
     }
     function onKeydown(e) {
       if (e.key === "Enter" && !e.shiftKey) {
