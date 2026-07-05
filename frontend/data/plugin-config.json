@@ -10,5 +10,11 @@
       "My Vault",
       "Corpus"
     ]
+  },
+  "pptx-editor": {
+    "enabledVaults": [
+      "My Vault",
+      "Corpus"
+    ]
   }
 }

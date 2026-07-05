@@ -259,10 +259,10 @@ const server = app.listen(config.port, async () => {
   await initPlugins({ app, config, wss, watcher });
 
   // Auto-enable bundled plugins for all vaults.
-  // office-reader нужен там же, где агент: docx из чата открывается его view.
+  // office-reader: DOCX; pptx-editor: PPTX via NativePowerPointDocEditor.
   const discovered = getDiscoveredPlugins();
 
-  for (const pluginId of ["agent", "office-reader"]) {
+  for (const pluginId of ["agent", "office-reader", "pptx-editor"]) {
     if (!discovered.find((p) => p.id === pluginId)) continue;
 
     for (const vaultId of Object.keys(config.vaults)) {

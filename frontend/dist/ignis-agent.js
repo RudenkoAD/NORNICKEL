@@ -4,47 +4,48 @@ var VIEW_TYPE = "obsidian-agent-chat";
 var VIEW_TITLE = "Agent Chat";
 var GRAPH_VIEW_TYPE = "obsidian-agent-graph";
 var GRAPH_VIEW_TITLE = "Knowledge Graph";
-function selectTextInEditor(editor, content, quote) {
-  const idx = content.indexOf(quote);
-  if (idx === -1) {
-    const lower = content.toLowerCase();
-    const ci = lower.indexOf(quote.toLowerCase());
-    if (ci === -1)
-      return;
-    positionEditor(editor, content, ci, quote.length);
-    return;
-  }
-  positionEditor(editor, content, idx, quote.length);
-}
-function positionEditor(editor, content, offset, length) {
-  const before = content.substring(0, offset);
-  const line = before.split("\n").length - 1;
-  const lineStart = before.lastIndexOf("\n") + 1;
-  const fromCh = offset - lineStart;
-  const beforeEnd = content.substring(0, offset + length);
-  const endLine = beforeEnd.split("\n").length - 1;
-  const endLineStart = beforeEnd.lastIndexOf("\n") + 1;
-  const toCh = offset + length - endLineStart;
-  editor.setSelection(
-    { line, ch: fromCh },
-    { line: endLine, ch: toCh }
-  );
-  editor.scrollIntoView(
-    { from: { line, ch: fromCh }, to: { line: endLine, ch: toCh } },
-    true
-  );
-}
 async function openAndHighlight(app, path, quote) {
   await app.workspace.openLinkText(path, "", false);
   if (!quote)
     return;
-  const view = app.workspace.getActiveViewOfType(MarkdownView);
-  if (!view || !view.editor)
-    return;
-  const content = view.editor.getValue();
-  if (!content)
-    return;
-  selectTextInEditor(view.editor, content, quote);
+  let attempts = 0;
+  function select() {
+    const view = app.workspace.getActiveViewOfType(MarkdownView);
+    if (!view || !view.editor) {
+      if (++attempts < 10)
+        setTimeout(select, 200);
+      return;
+    }
+    const editor = view.editor;
+    if (typeof editor.getSearchCursor === "function") {
+      const cursor = editor.getSearchCursor(quote, { line: 0, ch: 0 });
+      if (cursor.findNext()) {
+        editor.setSelection(cursor.from(), cursor.to());
+        editor.scrollIntoView({ from: cursor.from(), to: cursor.to() }, true);
+        return;
+      }
+    }
+    const content = editor.getValue();
+    if (!content)
+      return;
+    const idx = content.indexOf(quote);
+    if (idx !== -1) {
+      const pos = editor.offsetToPos(idx);
+      const end = editor.offsetToPos(idx + quote.length);
+      editor.setSelection(pos, end);
+      editor.scrollIntoView({ from: pos, to: end }, true);
+      return;
+    }
+    const lower = content.toLowerCase();
+    const ci = lower.indexOf(quote.toLowerCase());
+    if (ci !== -1) {
+      const pos = editor.offsetToPos(ci);
+      const end = editor.offsetToPos(ci + quote.length);
+      editor.setSelection(pos, end);
+      editor.scrollIntoView({ from: pos, to: end }, true);
+    }
+  }
+  select();
 }
 var _graphData = null;
 var _graphView = null;

@@ -3,7 +3,7 @@
   "name": "Office Reader",
   "version": "0.1.0",
   "minAppVersion": "1.12.4",
-  "description": "Просмотр DOCX-файлов внутри Obsidian через mammoth — Ignis edition",
+  "description": "Просмотр DOCX / PPTX-файлов внутри Obsidian — Ignis edition",
   "author": "Ignis",
   "isDesktopOnly": false
 }
