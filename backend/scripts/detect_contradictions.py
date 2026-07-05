@@ -50,8 +50,8 @@ DEFAULT_GAP_FRACTION = 0.2
 FETCH_NUMERIC_FACTS = f"""
 MATCH (x)-[r]->(p:{Node.PARAMETER})
 WHERE type(r) IN $numeric_rels
-  AND r.value_min IS NOT NULL AND r.value_max IS NOT NULL
-  AND r.needs_review IS NULL AND r.deleted IS NULL
+  
+  AND coalesce(r.needs_review, false) = false AND r.deleted IS NULL
 WITH x, p, r
 OPTIONAL MATCH (cl:{Node.CLAIM} {{source_doc_id: r.source_doc_id}})-[:{Rel.ABOUT}]->(p)
 RETURN elementId(x) AS src_eid,

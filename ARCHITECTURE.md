@@ -81,7 +81,7 @@
 
 | Label | Свойства | Комментарий |
 |---|---|---|
-| `Document` | `doc_id`* (uuid), `title`, `doc_type` (article/patent/report/protocol/reference), `year`, `language` (ru/en), `geography` (**RU/foreign**), `country`, `authors` (list), `trust_level` (high/medium/low), `access_level` (public/internal), `content_hash`, `source_path`, `summary`, `embedding`, `imported_at` | `full_text` НЕ хранится в узле — лежит файлом `data/texts/{doc_id}.txt`. `authors` обязателен — из него строятся `cite_key` «[Иванов 2023]». **`trust_level`/`access_level` задаёт КОД, не LLM** (§4, шаг 2) |
+| `Document` | `doc_id`* (uuid), `title`, `doc_type` (article/patent/report/protocol/reference), `year`, `language` (ru/en), `geography` (**RU/foreign**), `country`, `authors` (list), `trust_level` (high/medium/low), `access_level` (public/internal), `content_hash`, `source_path`, `summary`, `embedding`, `imported_at` | `full_text` НЕ хранится в узле Document: полный текст живёт в `Chunk`-узлах (покрывают документ целиком), оригинал — в `corpus/` по `source_path`. Отдельного файлового хранилища текстов НЕТ (решение имплементации 04.07: тексты мигрируют внутри дампа БД). `authors` обязателен — из него строятся `cite_key` «[Иванов 2023]». **`trust_level`/`access_level` задаёт КОД, не LLM** (§4, шаг 2) |
 | `Chunk` | `chunk_id`* (`{doc_id}#{idx}`), `doc_id`, `idx`, `text`, `embedding` | `doc_id` нужен идемпотентной очистке (§4.5) и пересечению chunk-хитов с `filter_id` |
 | `Material` | `canonical_id`*, `name_ru`, `name_en`, `aliases` (list), `aliases_text` (string), `category`, `unresolved` (bool) | `aliases_text` = `" ".join(aliases)` — **fulltext-индекс Neo4j не индексирует массивы**, только строки |
 | `Process` | `canonical_id`*, `name_ru`, `name_en`, `aliases`, `aliases_text`, `domain` (hydro/pyro/eco/waste), `unresolved` | |
@@ -101,7 +101,7 @@
 | Ребро | От → К | Доп. свойства | Кто создаёт |
 |---|---|---|---|
 | `USES_MATERIAL` | Process/Equipment/Experiment → Material | — | LLM (§4.1) |
-| `HAS_CONDITION` | Process/Experiment → Parameter | `value_min`, `value_max`, `unit_canon`, `value_raw`, `unit_raw`, `operator_raw`, `value_text`, `needs_review` | LLM + units.py |
+| `HAS_CONDITION` | **Material**/Process/Experiment → Parameter | `value_min`, `value_max`, `unit_canon`, `value_raw`, `unit_raw`, `operator_raw`, `value_text`, `needs_review` | LLM + units.py. Material в from-set (03.07): состав/свойства материала — «вода содержит сульфаты 200–300 мг/л», «содержание Pt+Pd в концентрате >90%» — флагманский паттерн запросов кейса |
 | `PRODUCES` | Process/Experiment → Material/Parameter | те же числовые поля (выход 95%, доля в штейне/шлаке) | LLM + units.py |
 | `STUDIES` | Experiment → Process | — | LLM |
 | `USED_EQUIPMENT` | Experiment → Equipment | — | LLM |
@@ -525,12 +525,15 @@ NORNICKEL/
 │   │   ├── reference/           # справочники кейса: materials.csv, equipment.csv,
 │   │   │                        #   parameters.csv, experts.csv, experiments.csv, taxonomy.csv
 │   │   ├── corpus/              # демо-корпус: public/** и internal/** (→ access_level)
-│   │   └── texts/               # full_text документов (.gitignore)
+│   │                            # (файлового хранилища текстов нет: полный текст —
+│   │                            #  в Chunk-узлах графа, оригиналы — в corpus/)
 │   ├── scripts/
 │   │   ├── init_db.py           # schema.cypher по-стейтментно; __EMB_DIM__ str.replace
 │   │   ├── load_references.py   # bulk-импорт справочников + en-алиасы из глоссария
 │   │   ├── ingest_corpus.py     # пакетная загрузка + отчёт + матчинг подписок
 │   │   ├── detect_contradictions.py  # §4.6 + пересчёт n_publications
+│   │   ├── repair_units.py      # цикл §4.3: после пополнения units.yaml чинит
+│   │   │                        #   флагованные рёбра на месте, без переизвлечения
 │   │   ├── seed_demo.py         # §4.6: противоречия, internal-документ, корпус сценариев 5-6
 │   │   ├── gen_synthetic.py     # опция: ~1 млн узлов для PROFILE (таймбокс 1ч)
 │   │   ├── dump_db.sh           # neo4j-admin database dump — дамп готового графа в репо:

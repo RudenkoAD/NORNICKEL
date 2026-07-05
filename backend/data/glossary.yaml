@@ -294,3 +294,185 @@ arctic_conditions:
   label: Parameter
   ru: [арктические условия, условия арктики, крайний север]
   en: [Arctic conditions]
+
+# ===========================================================================
+# Пополнение 03.07-3 (консолидация синонимов по живому графу).
+# Группы для новых канонических сущностей reference/*.csv — гарантируют
+# кросс-языковой резолвинг (ru-чанк ↔ en-запрос, §4.4) и сшивание ru/en-дублей,
+# которые в графе оседали как отдельные unresolved-узлы (metal alloy ↔
+# металлический сплав, reduction melting ↔ восстановительное плавление и т.п.).
+# ===========================================================================
+
+# --- Материалы ---
+nickel_oxide:
+  label: Material
+  ru: [оксид никеля, оксиды никеля, закись никеля]
+  en: [nickel oxide, NiO]
+
+copper_oxide:
+  label: Material
+  ru: [оксид меди, оксиды меди]
+  en: [copper oxide, CuO]
+
+iron_oxide:
+  label: Material
+  ru: [оксид железа, оксиды железа, магнетит]
+  en: [iron oxide, magnetite]
+
+silica:
+  label: Material
+  ru: [диоксид кремния, кремнезём, оксид кремния]
+  en: [silica, silicon dioxide]
+
+carbon:
+  label: Material
+  ru: [углерод, углеродный восстановитель, кокс]
+  en: [carbon, coke]
+
+carbon_monoxide:
+  label: Material
+  ru: [монооксид углерода, оксид углерода, угарный газ]
+  en: [carbon monoxide, CO]
+
+metal_alloy:
+  label: Material
+  ru: [металлический сплав, сплав]
+  en: [metal alloy, alloy]
+
+metallic_phase:
+  label: Material
+  ru: [металлическая фаза, металлические включения, металлическая взвесь]
+  en: [metallic phase, metal inclusions, metallic phase particles, metal suspension]
+
+metal_bead:
+  label: Material
+  ru: [королёк, корольки, металлический королёк]
+  en: [metal bead, metal droplet]
+
+iron_silicate_melt:
+  label: Material
+  ru: [железосиликатный расплав, силикатная основа шлака]
+  en: [iron silicate melt, fayalitic melt]
+
+fayalite:
+  label: Material
+  ru: [фаялит, железосиликат]
+  en: [fayalite]
+
+# --- Процессы ---
+smelting:
+  label: Process
+  ru: [плавка, штейновая плавка]
+  en: [smelting, matte smelting]
+
+oxidative_smelting:
+  label: Process
+  ru: [окислительная плавка]
+  en: [oxidative smelting, oxidizing smelting]
+
+reduction_smelting:
+  label: Process
+  ru: [восстановительная плавка, восстановительное плавление]
+  en: [reduction smelting, reduction melting, reductive smelting]
+
+oxide_reduction:
+  label: Process
+  ru: [восстановление оксидов, восстановление оксидов металлов, восстановление]
+  en: [oxide reduction, reduction of metal oxides]
+
+depletion:
+  label: Process
+  ru: [обеднение, обеднение шлака]
+  en: [depletion, slag depletion]
+
+magnetic_separation:
+  label: Process
+  ru: [магнитная сепарация, магнитное обогащение]
+  en: [magnetic separation]
+
+leaching:
+  label: Process
+  ru: [выщелачивание]
+  en: [leaching]
+
+precious_metal_refining:
+  label: Process
+  ru: [аффинаж, аффинажный передел]
+  en: [precious metal refining, affination]
+
+coalescence:
+  label: Process
+  ru: [коалесценция, коалесценция сульфидов, коалесценция металлических частиц]
+  en: [coalescence]
+
+thermodynamic_modeling:
+  label: Process
+  ru: [термодинамическое моделирование, термодинамический расчёт]
+  en: [thermodynamic modeling, thermodynamic modelling]
+
+# --- Оборудование ---
+vanyukov_furnace:
+  label: Equipment
+  ru: [печь ванюкова, двухзонная печь ванюкова, пв]
+  en: [Vanyukov furnace, two-zone Vanyukov furnace]
+
+reverberatory_furnace:
+  label: Equipment
+  ru: [отражательная печь, анодная отражательная печь]
+  en: [reverberatory furnace]
+
+# --- Параметры ---
+liquidus_temperature:
+  label: Parameter
+  ru: [температура ликвидус, температура ликвидуса]
+  en: [liquidus temperature]
+
+melting_temperature:
+  label: Parameter
+  ru: [температура плавления]
+  en: [melting temperature, melting point]
+
+slag_viscosity:
+  label: Parameter
+  ru: [вязкость шлака]
+  en: [slag viscosity]
+
+# ===========================================================================
+# Пополнение 04.07 (консолидация по графу, партия №1: журналы «Горная
+# промышленность»/«Цветные металлы» + конференции; домен геомеханики/НДС массива).
+# Частые (≥3 упоминаний) доменные сущности, оседавшие в графе как unresolved-узлы.
+# canonical_id совпадают с новыми строками reference/*.csv — load_references сшивает.
+# ===========================================================================
+
+# --- Параметры ---
+rock_quality_designation:
+  label: Parameter
+  ru: [RQD, показатель качества породы, индекс RQD]
+  en: [RQD, rock quality designation]
+
+economic_effect:
+  label: Parameter
+  ru: [экономический эффект, экономический эффект от внедрения]
+  en: [economic effect, economic benefit]
+
+# --- Процессы ---
+overcoring:
+  label: Process
+  ru: [полная разгрузка керна, метод полной разгрузки керна, разгрузка керна]
+  en: [overcoring, overcoring method]
+
+# --- Оборудование ---
+cae_fidesys:
+  label: Equipment
+  ru: [CAE Fidesys, Fidesys, программный комплекс CAE Fidesys]
+  en: [CAE Fidesys]
+
+axial_extensometer:
+  label: Equipment
+  ru: [осевой экстензометр]
+  en: [axial extensometer]
+
+radial_extensometer:
+  label: Equipment
+  ru: [радиальный экстензометр]
+  en: [radial extensometer]

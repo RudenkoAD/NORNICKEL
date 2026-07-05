@@ -8,12 +8,12 @@
 #   type — класс оборудования (furnace/cell/reactor/separator/pump/exchanger/tank/mill)
 canonical_id,name_ru,name_en,aliases,type
 flash_furnace,печь взвешенной плавки,flash smelting furnace,ПВП;печь ВП,furnace
-electric_furnace,электропечь,electric furnace,руднотермическая печь;РТП,furnace
+electric_furnace,электропечь,electric furnace,руднотермическая печь;РТП;обеднительная электропечь,furnace
 tube_furnace,трубчатая печь,tube furnace,трубчатая вращающаяся печь;вращающаяся печь,furnace
-converter,конвертер,converter,горизонтальный конвертер;конвертер Пирса-Смита,furnace
+converter,конвертер,converter,горизонтальный конвертер;конвертер Пирса-Смита;конвертер Пирса‑Смита;Peirce-Smith converter,furnace
 anode_furnace,анодная печь,anode furnace,,furnace
 roasting_furnace,обжиговая печь,roasting furnace,печь кипящего слоя,furnace
-electrolysis_cell,ванна электролиза,electrolysis cell,электролизная ванна;электролизёр,cell
+electrolysis_cell,ванна электролиза,electrolysis cell,электролизная ванна,cell
 diaphragm_cell,диафрагменная ячейка,diaphragm cell,диафрагменный электролизёр,cell
 electrowinning_cell,ванна электроэкстракции,electrowinning cell,ячейка электроэкстракции,cell
 electrolyzer,электролизёр,electrolyzer,электролизная установка,cell
@@ -44,7 +44,18 @@ mixer,смеситель,mixer,реактор-смеситель;мешалка,
 conveyor,конвейер,conveyor,ленточный конвейер,separator
 belt_filter,ленточный фильтр,belt filter,ленточный вакуум-фильтр,separator
 spray_dryer,распылительная сушилка,spray dryer,,exchanger
-electrode,электрод,electrode,анод;катод,cell
+electrode,электрод,electrode,,cell
 anode,анод,anode,растворимый анод,cell
 cathode,катод,cathode,катодная основа,cell
 launder,желоб,launder,разливочный желоб,separator
+# --- Пополнение 03.07-3 (консолидация по живому графу): плавильные агрегаты
+# --- пиро-передела, отсутствовавшие в стартовом справочнике.
+vanyukov_furnace,печь Ванюкова,Vanyukov furnace,ПВ;двухзонная печь Ванюкова;two-zone Vanyukov furnace,furnace
+reverberatory_furnace,отражательная печь,reverberatory furnace,анодная отражательная печь,furnace
+induction_furnace,индукционная печь,induction furnace,индукционная тигельная печь,furnace
+dc_furnace,печь постоянного тока,DC furnace,дуговая печь постоянного тока,furnace
+arc_furnace,дуговая сталеплавильная печь,electric arc furnace,ДСП;дуговая печь,furnace
+# --- Пополнение 04.07 (консолидация по графу, партия №1: геомеханика/ПО). ---
+cae_fidesys,CAE Fidesys,CAE Fidesys,Fidesys;программный комплекс CAE Fidesys,software
+axial_extensometer,осевой экстензометр,axial extensometer,,sensor
+radial_extensometer,радиальный экстензометр,radial extensometer,,sensor

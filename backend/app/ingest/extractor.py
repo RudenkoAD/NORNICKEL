@@ -12,6 +12,7 @@ known_entities (имена всех entities предыдущих чанков) 
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any, Optional
 
@@ -177,13 +178,22 @@ def _norm_confidence(value: Any) -> str:
     return value if value in ("high", "medium", "low") else "medium"
 
 
-async def extract_document(llm: Any, chunks: list) -> tuple[list, dict]:
-    """Извлечение по всем чанкам ОДНОГО документа, ПОСЛЕДОВАТЕЛЬНО (§4, шаг 4).
+# Чанков в одной конкурентной группе (04.07): полная последовательность душила
+# большие документы (выпуск журнала = 30+ чанков × 40-60с ≫ сторожевого doc-timeout),
+# полная параллельность убила бы накопление known_entities. Компромисс: внутри группы
+# чанки конкурентны с ОДНИМ снапшотом known, между группами — обмен именами.
+CHUNK_BATCH_SIZE = 4
 
-    known_entities накапливаются между чанками (имена всех entities, увиденных ранее),
-    чтобы модель переиспользовала имена и не плодила висячие сущности. Возвращает
-    (results, stats): results — список по чанкам, где элемент = dict извлечения или None
-    (провалившийся чанк); stats = {'chunks_ok', 'chunks_failed'}.
+
+async def extract_document(llm: Any, chunks: list) -> tuple[list, dict]:
+    """Извлечение по чанкам ОДНОГО документа группами по CHUNK_BATCH_SIZE (§4, шаг 4).
+
+    known_entities накапливаются МЕЖДУ группами (имена всех entities предыдущих групп),
+    чтобы модель переиспользовала имена и не плодила висячие сущности; внутри группы
+    чанки независимы — небольшая потеря межчанковой связности в обмен на ~4-кратное
+    ускорение больших документов. Возвращает (results, stats): results — список по
+    чанкам в исходном порядке (None = провалившийся чанк),
+    stats = {'chunks_ok', 'chunks_failed'}.
 
     `chunks` — список объектов с .idx/.text (ingest.chunker.Chunk); порядок сохраняется.
     """
@@ -193,27 +203,30 @@ async def extract_document(llm: Any, chunks: list) -> tuple[list, dict]:
     chunks_ok = 0
     chunks_failed = 0
 
-    for chunk in chunks:
+    async def _one(chunk: Any, known_snapshot: list[str]) -> Optional[dict]:
         text = getattr(chunk, "text", None)
         if not isinstance(text, str) or not text.strip():
-            results.append(None)
-            chunks_failed += 1
-            continue
+            return None
+        return await extract_chunk(llm, text, known_snapshot)
 
-        extraction = await extract_chunk(llm, text, known)
-        if extraction is None:
-            results.append(None)
-            chunks_failed += 1
-            continue
+    for start in range(0, len(chunks), CHUNK_BATCH_SIZE):
+        group = chunks[start:start + CHUNK_BATCH_SIZE]
+        snapshot = list(known)
+        group_results = await asyncio.gather(*(_one(c, snapshot) for c in group))
 
-        results.append(extraction)
-        chunks_ok += 1
-        # Копим известные имена для следующих чанков (уникально, с сохранением порядка).
-        for ent in extraction["entities"]:
-            name = ent["name"]
-            if name not in seen:
-                seen.add(name)
-                known.append(name)
+        for extraction in group_results:
+            if extraction is None:
+                results.append(None)
+                chunks_failed += 1
+                continue
+            results.append(extraction)
+            chunks_ok += 1
+            # Обмен именами МЕЖДУ группами (уникально, с сохранением порядка).
+            for ent in extraction["entities"]:
+                name = ent["name"]
+                if name not in seen:
+                    seen.add(name)
+                    known.append(name)
 
     stats = {"chunks_ok": chunks_ok, "chunks_failed": chunks_failed}
     return results, stats

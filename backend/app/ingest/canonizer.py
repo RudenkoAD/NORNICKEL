@@ -34,13 +34,21 @@ import re
 import unicodedata
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import yaml
 
 from app.db.constants import KEY_PROPERTY, Node
 
+
+def _key_prop(label: str) -> str:
+    return KEY_PROPERTY.get(label, "canonical_id")
+
 log = logging.getLogger(__name__)
+
+# Warn-once по недоступности fulltext-фолбэка (нет индекса/БД) — иначе по строке
+# лога на каждый термин каждого запроса.
+_FT_FALLBACK_WARNED = False
 
 # Пути по умолчанию (§4.4): backend/data/reference и backend/data/glossary.yaml.
 _DATA_DIR = Path(__file__).resolve().parents[2] / "data"
@@ -114,6 +122,93 @@ _HAS_CYR_RE = re.compile(r"[а-яё]")
 _HAS_LAT_RE = re.compile(r"[a-z]")
 
 
+# --- Лемматизация имён сущностей (§4.4, запрос команды 03.07) -------------------- #
+# «катодного никеля» → «катодный никель»: LLM извлекает имена в падеже из текста,
+# справочники — в именительном единственном. Без приведения формы плодятся
+# unresolved-дубли и падает попадание в словарь.
+#
+# Правило НАМЕРЕННО консервативное: склоняем ТОЛЬКО главное существительное
+# (первое NOUN фразы) и согласованные с ним прилагательные/причастия ПЕРЕД ним.
+# Всё после главного существительного — не трогаем: родительные дополнения
+# («электроэкстракция никеля», «масса шлака») — правильная каноническая форма.
+_MORPH = None  # ленивый синглтон MorphAnalyzer (~1с инициализация)
+
+_TOKEN_KEEP_RE = re.compile(r"[0-9a-z\-–—/().,%]", re.IGNORECASE)
+
+
+def _morph():
+    global _MORPH
+    if _MORPH is None:
+        import pymorphy3
+
+        _MORPH = pymorphy3.MorphAnalyzer()
+    return _MORPH
+
+
+def _is_acronym(token: str) -> bool:
+    """КПП, МПГ, ДМ, ОВП, КМСП… — не лемматизируем (pymorphy их коверкает)."""
+    return token.isupper() and 2 <= len(token) <= 6
+
+
+def _lemmatize_phrase(name: str) -> str:
+    """Главное существительное → им.п. ед.ч., прилагательные перед ним — согласуются.
+
+    Токены с цифрами/латиницей/дефисами/пунктуацией и аббревиатуры не трогаем.
+    Нет существительного или морфология не справилась — возвращаем вход как есть.
+    """
+    tokens = name.split()
+    if not tokens or len(tokens) > 6:
+        return name
+
+    morph = _morph()
+
+    def best_parse(token: str):
+        """Лучший (по score) разбор без фамильных/именных вариантов.
+
+        Берём именно ЛУЧШИЙ, а не «первый подходящей части речи»: у причастий типа
+        «драгметаллсодержащих» бывает маловероятный предсказанный NOUN-разбор,
+        который иначе перехватывает роль головы; а «промпродуктов» без фильтра
+        Surn разбирается как фамилия «Промпродуктов» в им.п.
+        """
+        if _is_acronym(token) or _TOKEN_KEEP_RE.search(token) or not _HAS_CYR_RE.search(token.lower()):
+            return None
+        for p in morph.parse(token):
+            if not any(g in p.tag for g in ("Surn", "Name", "Patr")):
+                return p
+        return None
+
+    # Голова = первый токен, чей лучший разбор — существительное.
+    head_i, head_p = None, None
+    for i, tok in enumerate(tokens):
+        p = best_parse(tok)
+        if p is not None and p.tag.POS == "NOUN":
+            head_i, head_p = i, p
+            break
+    if head_p is None:
+        return name
+
+    target = {"nomn"} if "Pltm" in head_p.tag else {"nomn", "sing"}
+    head_form = head_p.inflect(frozenset(target))
+    if head_form is None:
+        return name
+
+    out = list(tokens)
+    out[head_i] = head_form.word
+    gender = head_p.tag.gender
+
+    # Прилагательные/причастия ПЕРЕД головой согласуем (падеж/число/род).
+    for i in range(head_i):
+        adj = best_parse(tokens[i])
+        if adj is None or adj.tag.POS not in ("ADJF", "PRTF"):
+            continue
+        grams = {"nomn", "sing"} | ({gender} if gender else set())
+        form = adj.inflect(frozenset(grams)) or adj.inflect(frozenset({"nomn", "sing"}))
+        if form is not None:
+            out[i] = form.word
+
+    return " ".join(out)
+
+
 class Canonizer:
     """Резолвер имён в canonical_id по справочникам кейса + глоссарию (§4.4)."""
 
@@ -125,7 +220,6 @@ class Canonizer:
     ) -> None:
         self.reference_dir = Path(reference_dir) if reference_dir else DEFAULT_REFERENCE_DIR
         self.glossary_path = Path(glossary_path) if glossary_path else DEFAULT_GLOSSARY_PATH
-        # Fulltext-fallback к Neo4j на этом этапе не делаем (§4.4): клиент = None, заглушка.
         self._client = neo4j_client
 
         # Индекс: (label, нормализованный_alias) -> CanonEntity. Один и тот же alias у
@@ -169,6 +263,15 @@ class Canonizer:
         return text
 
     @staticmethod
+    def lemmatize(name: str) -> str:
+        """Приведение к канонической форме: главное существительное → им.п. ед.ч. (§4.4).
+
+        «катодного никеля» → «катодный никель»; «электроэкстракция никеля» — без
+        изменений (родительное дополнение после головы не трогаем).
+        """
+        return _lemmatize_phrase(str(name or "").strip())
+
+    @staticmethod
     def slug(name: str) -> str:
         """canonical_id для промаха (§4.4): транслит в латиницу + [a-z0-9-].
 
@@ -197,16 +300,15 @@ class Canonizer:
         подтверждения. Fulltext-fallback к Neo4j — TODO (клиент None), пока сразу slug.
         """
         self._check_label(label)
-        hit = self.lookup(name, label)
+        hit = self.lookup(name, label)  # включает fulltext-фолбэк при наличии клиента
         if hit is not None:
             return hit
 
-        # TODO(§4.4): при подключённом Neo4j-клиенте — fulltext-запрос по entity_names
-        #   (порог score); нашли — маппим и дозаписываем alias. Пока client=None → slug.
-        self._fulltext_fallback(name, label)
-
+        # Каноническая форма заглушки — лемма («катодного никеля» → «катодный никель»):
+        # разные падежи одного термина сходятся в один узел, исходное имя — в aliases.
+        lemma = self.lemmatize(name)
         norm = self.normalize(name)
-        cid = self.slug(name)
+        cid = self.slug(lemma)
         key = (label, cid)
         existing = self._by_id.get(key)
         if existing is not None:
@@ -215,13 +317,14 @@ class Canonizer:
             self._register_alias(label, norm, existing)
             return existing
 
+        aliases = [lemma] if lemma == name else [lemma, name]
         entity = CanonEntity(
             canonical_id=cid,
             label=label,
-            name_ru=name if _HAS_CYR_RE.search(norm) else None,
-            name_en=name if not _HAS_CYR_RE.search(norm) else None,
-            aliases=[name],
-            aliases_text=name,
+            name_ru=lemma if _HAS_CYR_RE.search(norm) else None,
+            name_en=lemma if not _HAS_CYR_RE.search(norm) else None,
+            aliases=aliases,
+            aliases_text=" ".join(aliases),
             unresolved=True,
             extra={},
         )
@@ -239,6 +342,9 @@ class Canonizer:
         БЕЗ создания узлов и БЕЗ дозаписи алиасов — иначе каждый вопрос с опечаткой
         рождал бы мусорные узлы и ложные «пробелы» (§4.4). Нерезолвнутый термин запроса
         планировщик оставляет в query_text для semantic_search (§5.1).
+
+        Если справочного попадания нет — fallback к fulltext Neo4j (entity_names): ищет
+        уже существующие в графе unresolved-сущности и сущности без справочной записи.
         """
         self._check_label(label)
         norm = self.normalize(name)
@@ -247,11 +353,21 @@ class Canonizer:
         hit = self._index.get((label, norm))
         if hit is not None:
             return hit
+        # Лемма («никеля» → «никель»): справочники в им.п. ед.ч., текст — в падежах.
+        lemma_norm = self.normalize(self.lemmatize(name))
+        if lemma_norm != norm:
+            hit = self._index.get((label, lemma_norm))
+            if hit is not None:
+                return hit
         # Транслит-вариант однословного термина (Ni↔Ни): пробуем оба направления.
         for variant in _translit_variants(norm):
             hit = self._index.get((label, variant))
             if hit is not None:
                 return hit
+        # Neo4j fulltext fallback: ищем в уже загруженных узлах графа.
+        ft_hit = self._fulltext_fallback(name, label)
+        if ft_hit is not None:
+            return ft_hit
         return None
 
     # ------------------------------------------------------------------ #
@@ -411,15 +527,79 @@ class Canonizer:
             entity.aliases.append(norm_alias)
             entity.aliases_text = " ".join(entity.aliases)
 
-    def _fulltext_fallback(self, name: str, label: str) -> None:
-        """Заглушка fulltext-fallback к Neo4j (§4.4). На этом этапе клиент = None.
+    def _fulltext_fallback(self, name: str, label: str) -> Optional[CanonEntity]:
+        """Fulltext-fallback к Neo4j: поиск по entity_names для lookup (§4.4).
 
-        TODO(§4.4): когда canonizer получит Neo4j-клиент — здесь fulltext-запрос по
-        индексу entity_names с порогом score; при попадании маппить имя на найденный
-        canonical_id и дозаписывать alias. Пока клиента нет — no-op, resolve() уходит в
-        slug.
+        Схема «кандидаты → точная приёмка» (04.07): fulltext — только ГЕНЕРАТОР
+        кандидатов (топ-5 по скору), приёмка — детерминированная. Кандидат проходит,
+        только если normalize(term) или normalize(lemmatize(term)) посимвольно равны
+        одному из его нормализованных имён/алиасов — та же проверка, которой матчится
+        справочник, но по алиасам живого графа. Lucene-скор порогом НЕ является
+        (BM25 не нормирован; прежний `score > 1.5` с fuzzy-хвостом мог молча подменить
+        сущность в фильтрах — ложное попадание тут дороже промаха: промах штатно
+        уходит в semantic_search через query_text, §5.1).
+
+        Неоднозначность (несколько прошедших приёмку — в графе есть дубли):
+        референсный узел важнее unresolved, дальше по скору; >1 прошедших — debug-лог
+        как сигнал для цикла консолидации синонимов.
         """
-        return None
+        if self._client is None:
+            return None
+        norm = self.normalize(name)
+        if not norm or len(norm) < 2:
+            return None
+        lemma_norm = self.normalize(self.lemmatize(name))
+        accepted_keys = {norm, lemma_norm}
+        # Экранируем спецсимволы Lucene: + - && || ! ( ) { } [ ] ^ " ~ * ? : \ /
+        safe = re.sub(r"([+\-&|!(){}[\]^\"~*?:\\/])", r"\\\1", norm)
+        try:
+            rows = self._client.read(
+                "CALL db.index.fulltext.queryNodes('entity_names', $q) "
+                "YIELD node, score WHERE $label IN labels(node) "
+                "RETURN node, score ORDER BY score DESC LIMIT 5",
+                {"q": f'"{safe}"', "label": label},
+            )
+        except Exception as err:  # noqa: BLE001 — инфраструктура (нет индекса/БД)
+            global _FT_FALLBACK_WARNED
+            if not _FT_FALLBACK_WARNED:
+                _FT_FALLBACK_WARNED = True
+                log.warning("canonizer: fulltext-фолбэк недоступен (%s) — "
+                            "термины запроса уходят в semantic_search", err)
+            return None
+
+        verified: list[tuple[bool, float, Any]] = []
+        for row in rows:
+            node = row["node"]
+            names = [node.get("name_ru"), node.get("name_en"), node.get("name"),
+                     *(node.get("aliases") or [])]
+            node_keys = {self.normalize(n) for n in names if n}
+            if accepted_keys & node_keys:
+                verified.append((bool(node.get("unresolved")), -float(row["score"]), node))
+            else:
+                log.debug("canonizer: fulltext-кандидат отвергнут приёмкой: %r vs %s",
+                          name, sorted(node_keys)[:4])
+        if not verified:
+            return None
+        if len(verified) > 1:
+            log.debug("canonizer: %d узлов прошли приёмку для %r (%s) — дубли, "
+                      "кандидаты в консолидацию синонимов", len(verified), name, label)
+        verified.sort()  # (unresolved=False раньше, затем больший скор)
+        node = verified[0][2]
+        cid = node.get(_key_prop(label)) or node.get("canonical_id")
+        if not cid:
+            return None
+        entity = CanonEntity(
+            canonical_id=cid,
+            label=label,
+            name_ru=node.get("name_ru") or node.get("name"),
+            name_en=node.get("name_en"),
+            aliases=node.get("aliases") or [],
+            aliases_text=node.get("aliases_text") or "",
+            unresolved=bool(node.get("unresolved")),
+            extra=node.get("extra") or {},
+        )
+        log.debug("canonizer: fulltext-приёмка %r → %s", name, cid)
+        return entity
 
     @staticmethod
     def _check_label(label: str) -> None:

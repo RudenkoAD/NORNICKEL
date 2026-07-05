@@ -8,7 +8,9 @@
 Инварианты, за которые отвечает этот модуль:
 - Все читающие шаблоны исключают soft-deleted рёбра (`r.deleted IS NULL`) и, для partner,
   Document{access_level:'internal'} (§6, §7).
-- Строгие числовые фильтры отбрасывают факты `needs_review` (§4.2): `r.needs_review IS NULL`.
+- Строгие числовые фильтры отбрасывают факты `needs_review` (§4.2): валидатор
+  пишет needs_review=false (не NULL), поэтому фильтр — coalesce(...,false)=false
+  (04.07: `IS NULL` отсекал ВСЕ факты — валидатор всегда ставит bool).
 - Consensus/Claims — только не устаревшие: `c.superseded_by IS NULL` (§5.2).
 - Динамические ключи свойств/типов рёбер — только через APOC (Cypher-параметр ключом быть
   не может), но значения — всегда параметры (никакой конкатенации пользовательского ввода).
@@ -149,11 +151,17 @@ def build_strict_filters(
         num_rel_types = list(NUMERIC_RELS)
         for i, nf in enumerate(numeric):
             p, mn, mx = f"num{i}_param", f"num{i}_min", f"num{i}_max"
+            # Пересечение интервалов с ПОЛУОТКРЫТЫМИ границами (04.07, adversarial
+            # review): value_min/value_max = null кодирует ±inf (§3.1). В Cypher
+            # `null <= x` = null = FALSE в WHERE — без IS NULL факт «≤300 мг/л»
+            # (value_min=null) НИКОГДА не проходил фильтр, ломая флагманский запрос
+            # кейса «сульфаты ≤300». null-граница = «нет ограничения с этой стороны».
             where.append(
                 f"EXISTS {{ MATCH (x)-[r]->(p:{Node.PARAMETER} {{canonical_id: ${p}}}) "
                 f"WHERE type(r) IN $numeric_rel_types AND r.source_doc_id = d.doc_id "
-                f"AND r.value_min <= ${mx} AND r.value_max >= ${mn} "
-                f"AND r.needs_review IS NULL AND r.deleted IS NULL }}"
+                f"AND (r.value_min IS NULL OR ${mx} IS NULL OR r.value_min <= ${mx}) "
+                f"AND (r.value_max IS NULL OR ${mn} IS NULL OR r.value_max >= ${mn}) "
+                f"AND coalesce(r.needs_review, false) = false AND r.deleted IS NULL }}"
             )
             params[p] = nf["param"]
             params[mn] = nf["value_min"]
@@ -188,8 +196,9 @@ def build_strict_filters(
 # ---------------------------------------------------------------------------
 PARAM_RANGE_MATCH = f"""
 MATCH (x)-[r:{Rel.HAS_CONDITION}]->(p:{Node.PARAMETER} {{canonical_id: $param}})
-WHERE r.value_min <= $q_max AND r.value_max >= $q_min
-  AND r.needs_review IS NULL AND r.deleted IS NULL
+WHERE (r.value_min IS NULL OR $q_max IS NULL OR r.value_min <= $q_max)
+  AND (r.value_max IS NULL OR $q_min IS NULL OR r.value_max >= $q_min)
+  AND coalesce(r.needs_review, false) = false AND r.deleted IS NULL
 RETURN x, r
 """.strip()
 
@@ -202,6 +211,15 @@ CHUNK_VECTOR_SEARCH = f"""
 CALL db.index.vector.queryNodes('{VectorIndex.CHUNK}', $k, $query_vector) YIELD node, score
 RETURN node.chunk_id AS chunk_id, node.doc_id AS doc_id, node.idx AS idx, score
 ORDER BY score DESC
+""".strip()
+
+# BM25 по ПОЛНОМУ тексту чанков (04.07, гибрид): у bridge-документов чанк = весь
+# журнал, а эмбеддится только голова (EMB_MAX_CHARS) — термины в глубине документа
+# невидимы векторам; Lucene индексирует текст целиком.
+CHUNK_FULLTEXT_SEARCH = f"""
+CALL db.index.fulltext.queryNodes('chunk_fulltext', $q) YIELD node, score
+RETURN node.chunk_id AS chunk_id, node.doc_id AS doc_id, score
+ORDER BY score DESC LIMIT $k
 """.strip()
 
 DOC_VECTOR_SEARCH = f"""
@@ -421,6 +439,9 @@ def format_subgraph(graph: Any, role: str,
             dropped_eids.add(node.element_id)
             continue
 
+        # embedding (256 float) не нужен в UI/SSE и раздувает ответ ~325 КБ на
+        # review-подграф (04.07, adversarial review) — вырезаем из props.
+        props.pop("embedding", None)
         key = _node_stable_key(node)
         nodes_out.append({
             "key": key,
@@ -436,11 +457,20 @@ def format_subgraph(graph: Any, role: str,
             continue
         if rel.start_node.element_id in dropped_eids or rel.end_node.element_id in dropped_eids:
             continue
+        # RBAC (04.07, adversarial review): фактическое ребро идёт между ПУБЛИЧНЫМИ
+        # каноническими узлами (Material/Process/Parameter видны partner всегда), но
+        # его props несут провенанс из internal-документа — дословный `quote` и
+        # числовые интервалы. Оба конца выживают → ребро не дропалось → утечка.
+        # Для partner отбрасываем ребро целиком: оно И ЕСТЬ факт из закрытого дока.
+        if is_partner and str(rel.get("source_doc_id")) in nonpublic_doc_ids:
+            continue
+        props = dict(rel.items())
+        props.pop("embedding", None)  # рёбра эмбеддингов не несут, но единообразно
         edges_out.append({
             "from": _node_stable_key(rel.start_node),
             "to": _node_stable_key(rel.end_node),
             "type": rel.type,
-            "props": dict(rel.items()),
+            "props": props,
         })
 
     return {"nodes": nodes_out, "edges": edges_out}
@@ -469,10 +499,29 @@ def build_find_gaps(
     }
     access = _partner_access_predicate(role, "d")
 
-    lines = [
-        f"MATCH (m:{Node.MATERIAL}) WHERE ($materials IS NULL OR m.canonical_id IN $materials)",
-        f"MATCH (p:{Node.PROCESS}) WHERE ($processes IS NULL OR p.canonical_id IN $processes)",
-    ]
+    # 04.07: открытая ось = топ-40 по связности, а не все узлы метки. После
+    # Haiku-корпуса полное произведение (3000+ материалов × 2600+ процессов) —
+    # ~8 млн комбинаций: MemoryPoolOutOfMemory на /gaps без фильтров и 20-50 с
+    # top_gaps дашборда; пробел среди несвязных хвостов и не интерпретируем.
+    lines = []
+    if materials is None:
+        lines.append(
+            "CALL { "
+            f"MATCH (m0:{Node.MATERIAL}) "
+            f"OPTIONAL MATCH (m0)-[:{Rel.MENTIONED_IN}]->(:{Node.DOCUMENT}) "
+            "WITH m0, count(*) AS _md ORDER BY _md DESC LIMIT 40 RETURN m0 AS m }"
+        )
+    else:
+        lines.append(f"MATCH (m:{Node.MATERIAL}) WHERE m.canonical_id IN $materials")
+    if processes is None:
+        lines.append(
+            "CALL { "
+            f"MATCH (p0:{Node.PROCESS}) "
+            f"OPTIONAL MATCH (p0)-[:{Rel.MENTIONED_IN}]->(:{Node.DOCUMENT}) "
+            "WITH p0, count(*) AS _pd ORDER BY _pd DESC LIMIT 40 RETURN p0 AS p }"
+        )
+    else:
+        lines.append(f"MATCH (p:{Node.PROCESS}) WHERE p.canonical_id IN $processes")
 
     # Предикаты на документ комбинации: RBAC-доступ + (опц.) наличие env-условия.
     doc_predicates: list[str] = []
@@ -680,12 +729,21 @@ def cleanup_document_statements() -> list[str]:
     # Фактические рёбра LLM + служебные MENTIONED_IN/AUTHORED — по провенансу.
     for rel in list(FACT_RELS) + [Rel.MENTIONED_IN, Rel.AUTHORED]:
         stmts.append(f"MATCH ()-[r:{rel} {{source_doc_id: $doc_id}}]-() DELETE r")
-    # Осиротевшие unresolved-узлы без единого MENTIONED_IN (§4.5, опционально).
-    stmts.append(
-        "MATCH (n) WHERE n.unresolved = true "
-        f"AND NOT (n)-[:{Rel.MENTIONED_IN}]->(:{Node.DOCUMENT}) DETACH DELETE n"
-    )
+    # Очистка осиротевших unresolved-узлов вынесена из per-document (04.07,
+    # adversarial review): глобальный «MATCH (n) WHERE n.unresolved» на КАЖДЫЙ документ
+    # (а) полный скан графа → O(N²) на корпусе 1500 док, (б) при параллельной записи
+    # (asyncio.to_thread) рискует удалить unresolved-узлы соседней транзакции.
+    # Теперь — разовый пост-проход ORPHAN_UNRESOLVED_CLEANUP после импорта корпуса.
     return stmts
+
+
+# Разовая очистка осиротевших unresolved-узлов (§4.5): после ПОЛНОГО прогона корпуса,
+# когда все MENTIONED_IN уже проставлены. Безопасен вне конкурентной записи.
+ORPHAN_UNRESOLVED_CLEANUP = (
+    "MATCH (n) WHERE n.unresolved = true "
+    f"AND NOT (n)-[:{Rel.MENTIONED_IN}]->(:{Node.DOCUMENT}) DETACH DELETE n "
+    "RETURN count(n) AS removed"
+)
 
 
 # ---------------------------------------------------------------------------

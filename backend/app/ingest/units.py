@@ -174,6 +174,20 @@ class UnitRegistry:
         for unit, spec in (data.get("units", {}) or {}).items():
             self._units[unit] = spec
             self._units.setdefault(self._norm_unit(unit), spec)
+        # Casefold-словарь для регистронезависимого фоллбека («°С» ↔ «°с», 03.07).
+        # Коллизии с РАЗНЫМИ спецификациями (напр. «с»-секунда vs «С»-Цельсий)
+        # в ci-словарь не попадают: такие единицы матчатся только точно.
+        self._units_ci: dict[str, dict] = {}
+        _collisions: set[str] = set()
+        for unit, spec in self._units.items():
+            key = unit.casefold()
+            prev = self._units_ci.get(key)
+            if prev is not None and prev is not spec and prev != spec:
+                _collisions.add(key)
+            else:
+                self._units_ci[key] = spec
+        for key in _collisions:
+            self._units_ci.pop(key, None)
         # Фоллбек-контур: нераспознанные единицы (§4.3, уровень 2).
         self._unknown: dict[str, _UnknownUnitRecord] = {}
 
@@ -185,10 +199,17 @@ class UnitRegistry:
         return re.sub(r"\s+", "", unit.strip())
 
     def _lookup_spec(self, unit_raw: str) -> dict | None:
-        """Спецификация единицы по сырому написанию (точное или нормализованное)."""
+        """Спецификация единицы: точное совпадение → нормализованное → casefold.
+
+        Порядок важен: точный матч сохраняет регистрозависимые различия
+        («с» = секунда, «С» = Цельсий), casefold добирает варианты типа «°С»/«оС».
+        """
         if unit_raw in self._units:
             return self._units[unit_raw]
-        return self._units.get(self._norm_unit(unit_raw))
+        norm = self._norm_unit(unit_raw)
+        if norm in self._units:
+            return self._units[norm]
+        return self._units_ci.get(norm.casefold())
 
     # --- Публичный API реестра ---
 
@@ -274,6 +295,15 @@ class UnitRegistry:
         needs_review=False только если оператор и число распарсились.
         """
         operator = (operator_raw or "").strip().lower()
+
+        # category не передана явно (импорт: attach_interval/repair_units/resolve_review
+        # без справочного контекста, 04.07) → выводим из единицы: «°C» → temperature.
+        # Нужно для оператора «~» при v==0 (abs-дельта категории, §3.1) — иначе все
+        # факты «около 0» уходили бы в needs_review вместо интервала [−δ, +δ].
+        if category is None and unit_raw and str(unit_raw).strip():
+            spec = self._lookup_spec(str(unit_raw))
+            if spec is not None:
+                category = spec.get("category")
 
         # 1) Границы интервала В СЫРЫХ значениях по оператору (§3.1, таблица).
         raw = self._interval_raw(value_raw, operator, category)

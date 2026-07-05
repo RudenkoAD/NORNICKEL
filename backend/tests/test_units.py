@@ -114,11 +114,15 @@ def test_convert_unknown_raises(registry: UnitRegistry) -> None:
         registry.convert(1.0, "фунтов/дюйм")
 
 
-def test_currency_unit_known_but_not_convertible(registry: UnitRegistry) -> None:
-    """$/т в whitelist (is_known=True), но без множителя — convert бросает ошибку."""
-    assert registry.is_known("$/т")
-    with pytest.raises(UnknownUnitError):
-        registry.convert(100.0, "$/т")
+def test_currency_units_convert_within_currency(registry: UnitRegistry) -> None:
+    """04.07: валюты — свои категории (economic_usd/money_*): внутри валюты конвертация
+    точная (без курсов), МЕЖДУ валютами не пересекаются (разные canonical_unit)."""
+    v, canon = registry.convert(100.0, "$/т")
+    assert canon == "$/т" and v == 100.0
+    v, canon = registry.convert(2.0, "млрд руб.")
+    assert canon == "млн руб" and v == 2000.0
+    # руб/т и $/т живут в РАЗНЫХ категориях — фильтр их не смешает.
+    assert registry.convert(1.0, "руб/т")[1] != registry.convert(1.0, "USD/т")[1]
 
 
 def test_register_unknown_and_report() -> None:
@@ -139,3 +143,43 @@ def test_register_unknown_and_report() -> None:
 
 def test_unknown_units_report_empty_by_default() -> None:
     assert UnitRegistry().unknown_units_report() == []
+
+
+# --- Пополнение 03.07: кириллические градусы, г/мин, время, casefold-фоллбек ---
+
+def test_cyrillic_degree_variants(registry):
+    """«оС» (кир. о + кир. С), «°С» (заглавная кир. С), голая «С» — температура."""
+    for unit in ("оС", "°С", "С", "оC"):
+        assert registry.is_known(unit), unit
+        v, canon = registry.convert(1300.0, unit)
+        assert v == 1300.0 and canon == "°C", unit
+
+
+def test_case_sensitive_seconds_vs_celsius(registry):
+    """Регистр решает: «с» — секунды (время), «С» — Цельсий (температура)."""
+    _, canon_upper = registry.convert(100.0, "С")
+    assert canon_upper == "°C"
+    v, canon_lower = registry.convert(60.0, "с")
+    assert canon_lower == "мин" and abs(v - 1.0) < 1e-3
+
+
+def test_gram_per_minute(registry):
+    v, canon = registry.convert(100.0, "г/мин")
+    assert canon == "т/сут" and abs(v - 0.144) < 1e-9
+
+
+def test_time_units(registry):
+    assert registry.is_known("минут")
+    v, canon = registry.convert(2.0, "ч")
+    assert canon == "мин" and v == 120.0
+
+
+def test_density_viscosity_size_units(registry=None):
+    """Пополнение 03.07-2 (статья №17): плотность, вязкость (пуазы), размер частиц."""
+    reg = UnitRegistry()
+    v, canon = reg.convert(8.9, "г/см3")
+    assert canon == "г/см³" and v == 8.9
+    v, canon = reg.convert(45.0, "П∙10-3")   # 45×10⁻³ П = 0.0045 Па·с
+    assert canon == "Па·с" and abs(v - 0.0045) < 1e-9
+    v, canon = reg.convert(45.88, "мкм")
+    assert canon == "мкм" and v == 45.88

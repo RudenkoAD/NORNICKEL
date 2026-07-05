@@ -43,6 +43,13 @@ Statement = tuple[str, dict[str, Any]]
 # Ключевое свойство канонических узлов — из constants (инвариант №3).
 _CANON_KEY = KEY_PROPERTY[Node.MATERIAL]  # == "canonical_id" для всех CANONICAL_LABELS
 
+
+def _key_prop(label: str) -> str:
+    """Ключевое свойство метки из KEY_PROPERTY (03.07: у Expert/Experiment это
+    expert_id/exp_id, НЕ canonical_id — иначе эксперты из load_references и из
+    экстракции не сливаются, а constraint схемы не работает)."""
+    return KEY_PROPERTY.get(label, _CANON_KEY)
+
 # Числовые поля интервала на HAS_CONDITION/PRODUCES (§3.3): validator+units уже положили
 # их в relation. Writer только пробрасывает — сам ничего не считает (инвариант №1).
 _NUMERIC_EDGE_FIELDS = (
@@ -54,6 +61,8 @@ _NUMERIC_EDGE_FIELDS = (
     "operator_raw",
     "value_text",
     "needs_review",
+    "review_reason",  # причины проверок §4.2/§3.3 — без них needs_review нечитаем в UI
+    "auto_fixed",     # 'direction' = инверсия концов исправлена кодом (§3.3, 03.07)
 )
 
 # Метки, которые relation может связывать: тип ребра → допустимые метки концов.
@@ -163,10 +172,36 @@ def write_document(
 
     # (4) Рёбра из relations. Тип из Rel.*, провенанс на всех; для HAS_CONDITION/
     # PRODUCES — числовые поля из validator+units (просто проброс).
-    relations = merged.get("relations") or []
+    #
+    # Дедуп на КАНОНИЧЕСКИХ концах (03.07): overlap-зона чанков (§4, 300 токенов)
+    # извлекает одни и те же факты дважды с разными quote — семантически одинаковые
+    # рёбра (from_cid, type, to_cid, одинаковый numeric/value_text) схлопываем в одно,
+    # оставляя вариант с максимальной confidence (при равной — из раннего чанка).
+    # Разные числовые значения НЕ дедупим — это разные измерения.
+    _conf_rank = {"high": 0, "medium": 1, "low": 2}
+    relations = sorted(
+        merged.get("relations") or [],
+        key=lambda r: (_conf_rank.get(r.get("confidence"), 3), int(r.get("chunk_idx") or 0)),
+    )
+    seen_rel_keys: set[tuple] = set()
     needs_review_count = 0
     written_relations = 0
+    deduped_relations = 0
     for rel in relations:
+        from_ce = _resolve_end(rel.get("from"), rel.get("from_type"), canon_by_name)
+        to_ce = _resolve_end(rel.get("to"), rel.get("to_type"), canon_by_name)
+        if from_ce is not None and to_ce is not None:
+            # Ключ дедупа включает ЕДИНИЦУ и ОПЕРАТОР (04.07): без них «≥90 %» и
+            # «≤90 г/т» на одной паре схлопнулись бы в одно ребро — потеря измерения.
+            rel_key = (
+                from_ce.canonical_id, rel.get("type"), to_ce.canonical_id,
+                str(rel.get("value_raw")), str(rel.get("unit_raw")),
+                str(rel.get("operator_raw")), str(rel.get("value_text")),
+            )
+            if rel_key in seen_rel_keys:
+                deduped_relations += 1
+                continue
+            seen_rel_keys.add(rel_key)
         stmt = _relation_statement(rel, doc_id, canon_by_name)
         if stmt is None:
             continue
@@ -223,6 +258,7 @@ def write_document(
     return {
         "entities": len(canon_nodes),
         "relations": written_relations,
+        "deduped_relations": deduped_relations,
         "claims": written_claims,
         "needs_review": needs_review_count,
         "skipped": False,
@@ -279,6 +315,9 @@ def _merge_canon_node(cid: str, label: str, canon: Any, aliases: set[str]) -> St
         "aliases_text": aliases_text,
         "unresolved": bool(getattr(canon, "unresolved", False)),
     }
+    # У Expert/Experiment/Facility по схеме §3.2 отображаемое поле — `name`.
+    if _key_prop(label) != _CANON_KEY:
+        create_props["name"] = canon.name_ru or canon.name_en
     # Доп. типовые свойства (category/domain/type) из extra — только для своей метки.
     extra = getattr(canon, "extra", None) or {}
     for k, v in extra.items():
@@ -286,7 +325,7 @@ def _merge_canon_node(cid: str, label: str, canon: Any, aliases: set[str]) -> St
             create_props[k] = v
 
     cypher = (
-        f"MERGE (n:{label} {{{_CANON_KEY}: $cid}})\n"
+        f"MERGE (n:{label} {{{_key_prop(label)}: $cid}})\n"
         "ON CREATE SET n += $create_props\n"
         "ON MATCH SET n.aliases = apoc.coll.toSet(coalesce(n.aliases, []) + $alias_list),\n"
         "             n.aliases_text = apoc.text.join(\n"
@@ -330,8 +369,8 @@ def _relation_statement(
                 props[f] = rel[f]
 
     cypher = (
-        f"MATCH (a:{from_ce.label} {{{_CANON_KEY}: $from_cid}})\n"
-        f"MATCH (b:{to_ce.label} {{{_CANON_KEY}: $to_cid}})\n"
+        f"MATCH (a:{from_ce.label} {{{_key_prop(from_ce.label)}: $from_cid}})\n"
+        f"MATCH (b:{to_ce.label} {{{_key_prop(to_ce.label)}: $to_cid}})\n"
         f"CREATE (a)-[r:{rel_type}]->(b)\n"
         "SET r += $props, r.extracted_at = datetime()"
     )
@@ -362,7 +401,7 @@ def _resolve_end(
 def _mentioned_in_statement(cid: str, label: str, doc_id: str, chunk_idx: int) -> Statement:
     """MERGE (e)-[:MENTIONED_IN {source_doc_id, chunk_idx, extracted_at}]->(d) (§4.5)."""
     cypher = (
-        f"MATCH (e:{label} {{{_CANON_KEY}: $cid}})\n"
+        f"MATCH (e:{label} {{{_key_prop(label)}: $cid}})\n"
         f"MATCH (d:{Node.DOCUMENT} {{doc_id: $doc_id}})\n"
         f"MERGE (e)-[r:{Rel.MENTIONED_IN} {{source_doc_id: $doc_id}}]->(d)\n"
         "SET r.chunk_idx = $chunk_idx, r.extracted_at = datetime()"
@@ -495,7 +534,7 @@ def _claim_statements(
         stmts.append(
             (
                 f"MATCH (c:{Node.CLAIM} {{claim_id: $claim_id}})\n"
-                f"MATCH (t:{label} {{{_CANON_KEY}: $cid}})\n"
+                f"MATCH (t:{label} {{{_key_prop(label)}: $cid}})\n"
                 f"MERGE (c)-[r:{Rel.ABOUT} {{source_doc_id: $doc_id}}]->(t)\n"
                 "SET r.extracted_at = datetime()",
                 {"claim_id": claim_id, "cid": cid, "doc_id": doc_id},

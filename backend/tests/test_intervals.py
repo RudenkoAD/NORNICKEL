@@ -182,11 +182,13 @@ def test_unknown_unit_needs_review_not_raise(registry: UnitRegistry) -> None:
     assert "фунтов/дюйм" in (iv.review_reason or "")
 
 
-def test_currency_unit_needs_review(registry: UnitRegistry) -> None:
-    """$/т распознаётся, но не конвертируется (курс) → needs_review, значение как есть."""
+def test_currency_unit_needs_review(registry) -> None:
+    """04.07: $/т — своя категория economic_usd, конвертация внутри валюты БЕЗ флага
+    (раньше был multiplier:null → needs_review; тест обновлён под новую семантику)."""
     iv = registry.parse_numeric("15000", "$/т", "=")
-    assert iv.needs_review is True
-    assert iv.value_min == pytest.approx(15000.0)
+    assert iv.needs_review is False
+    assert iv.unit_canon == "$/т"
+    assert iv.value_min == iv.value_max == 15000.0
 
 
 # --- Десятичные разделители и пробелы-разряды ---
@@ -228,3 +230,22 @@ def test_interval_intersection_semantics(registry: UnitRegistry) -> None:
     q2 = registry.parse_numeric("400-500", "мг/л", "range")
     overlaps2 = fact.value_min <= q2.value_max and fact.value_max >= q2.value_min
     assert overlaps2 is False
+
+
+# ---------------------------------------------------------------------------
+# Полуоткрытые интервалы в strict_filters (04.07, adversarial review):
+# null-граница = «нет ограничения», не должна отбрасывать факт в WHERE.
+# ---------------------------------------------------------------------------
+def test_build_strict_filters_halfopen_interval_predicate():
+    """Cypher числового фильтра защищает от null-границ с ОБЕИХ сторон (§5.2):
+    факт «≤300» (value_min=null) и запрос «менее 200» (q_min=null) не теряются."""
+    from app.db.queries import build_strict_filters
+
+    cypher, params = build_strict_filters(
+        {"numeric": [{"param": "sulfates", "value_min": None, "value_max": 300.0}]},
+        role="researcher",
+    )
+    # Обе границы обёрнуты в IS NULL OR — иначе `null <= x` = FALSE губит факт/запрос.
+    assert "r.value_min IS NULL OR" in cypher
+    assert "IS NULL OR r.value_min <=" in cypher
+    assert "r.value_max IS NULL OR" in cypher

@@ -1,0 +1,20 @@
+{
+  "agent": {
+    "enabledVaults": [
+      "Corpus",
+      "My Vault"
+    ]
+  },
+  "office-reader": {
+    "enabledVaults": [
+      "My Vault",
+      "Corpus"
+    ]
+  },
+  "pptx-editor": {
+    "enabledVaults": [
+      "My Vault",
+      "Corpus"
+    ]
+  }
+}

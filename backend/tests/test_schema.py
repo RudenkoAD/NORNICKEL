@@ -19,20 +19,25 @@ def test_schema_has_no_placeholder_after_substitution() -> None:
 
 def test_schema_splits_into_expected_statements() -> None:
     stmts = load_statements(SCHEMA_PATH.read_text(encoding="utf-8"), emb_dim=256)
-    # 10 constraint + 4 range + 6 provenance + 6 node + 1 fulltext + 3 vector = 30.
-    assert len(stmts) == 30, f"ожидалось 30 statements, получено {len(stmts)}"
+    # 10 constraint + 4 range + 6 provenance + 6 node + 2 fulltext + 3 vector = 31
+    # (04.07: + chunk_fulltext — BM25 по полному тексту чанков для гибридного поиска).
+    assert len(stmts) == 31, f"ожидалось 31 statement, получено {len(stmts)}"
     assert all(not s.lstrip().startswith("//") for s in stmts), "комментарии не вырезаны"
     assert sum(s.startswith("CREATE CONSTRAINT") for s in stmts) == 10
     assert sum(s.startswith("CREATE VECTOR INDEX") for s in stmts) == 3
-    assert sum(s.startswith("CREATE FULLTEXT INDEX") for s in stmts) == 1
+    assert sum(s.startswith("CREATE FULLTEXT INDEX") for s in stmts) == 2
 
 
 def test_strict_filters_interval_predicate_and_needs_review() -> None:
     filters = {"numeric": [{"param": "param_sulfate", "value_min": 250.0, "value_max": 250.0}]}
     cypher, params = q.build_strict_filters(filters, role="researcher")
-    assert "r.value_min <= $num0_max" in cypher
-    assert "r.value_max >= $num0_min" in cypher
-    assert "r.needs_review IS NULL" in cypher  # инвариант №1 / §4.2
+    # Пересечение интервалов с защитой полуоткрытых границ (04.07).
+    assert "IS NULL OR r.value_min <= $num0_max" in cypher
+    assert "IS NULL OR r.value_max >= $num0_min" in cypher
+    # 04.07: валидатор пишет needs_review=false (не NULL) → фильтр coalesce, а не IS NULL
+    # (IS NULL отсекал ВСЕ факты — критический баг, найден detect_contradictions).
+    assert "coalesce(r.needs_review, false) = false" in cypher
+    assert "r.needs_review IS NULL" not in cypher
     assert "r.deleted IS NULL" in cypher       # soft-delete исключается
     assert params["num0_param"] == "param_sulfate"
     assert params["num0_min"] == 250.0 and params["num0_max"] == 250.0
@@ -93,6 +98,15 @@ def test_cleanup_document_statements_order_and_provenance() -> None:
     assert "Claim" in stmts[1] and "DETACH DELETE" in stmts[1]
     assert any("MENTIONED_IN {source_doc_id: $doc_id}" in s for s in stmts)
     assert any("AUTHORED {source_doc_id: $doc_id}" in s for s in stmts)
-    # Все statements кроме последнего (очистка осиротевших unresolved-узлов) — по $doc_id.
-    assert all("$doc_id" in s for s in stmts[:-1])
-    assert "unresolved" in stmts[-1] and "$doc_id" not in stmts[-1]
+    # 04.07: ВСЕ per-document statements строго по $doc_id — глобальная очистка
+    # осиротевших unresolved вынесена в разовый ORPHAN_UNRESOLVED_CLEANUP
+    # (полный скан на документ = O(N²) + гонка при параллельной записи).
+    assert all("$doc_id" in s for s in stmts)
+    assert not any("unresolved" in s for s in stmts)
+
+
+def test_orphan_unresolved_cleanup_is_global_and_safe() -> None:
+    """Разовая очистка сирот — глобальная (без $doc_id), возвращает счётчик."""
+    assert "$doc_id" not in q.ORPHAN_UNRESOLVED_CLEANUP
+    assert "unresolved" in q.ORPHAN_UNRESOLVED_CLEANUP
+    assert "count(n)" in q.ORPHAN_UNRESOLVED_CLEANUP
