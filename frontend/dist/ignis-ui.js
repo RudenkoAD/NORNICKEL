@@ -20603,6 +20603,8 @@ var IgnisUI = (() => {
   function parseMarkdown(text2) {
     if (!text2)
       return "";
+    text2 = text2.replace(/^\$\d+[\s:.-]*/gm, "");
+    text2 = text2.replace(/\$\d+/g, "");
     let html = escapeHtml(text2);
     html = html.replace(/^#### (.+)$/gm, "<h4>$1</h4>");
     html = html.replace(/^### (.+)$/gm, "<h3>$1</h3>");
@@ -22079,6 +22081,7 @@ Current: ${query}` : query;
       while (charTimer || pendingChars.length > 0) {
         await new Promise((r) => setTimeout(r, 30));
       }
+      fullAnswer = fullAnswer.replace(/^\$\d+[\s:.-]*/gm, "").replace(/\$\d+/g, "");
       if (!hasError) {
         const total = ((performance.now() - t0) / 1e3 * 0.9).toFixed(1);
         const first = firstTokenAt ? ((firstTokenAt - t0) / 1e3 * 0.9).toFixed(1) : total;
