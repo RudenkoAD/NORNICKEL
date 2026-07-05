@@ -21980,6 +21980,7 @@ Current: ${query}` : query;
       console.log("[agent] handleSSE started");
       stopCharAnim();
       const t0 = performance.now();
+      let firstTokenAt = null;
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buf = "";
@@ -22043,8 +22044,10 @@ Current: ${query}` : query;
                 case "token": {
                   const text2 = typeof payload === "string" ? payload : String(payload);
                   pendingChars += text2;
-                  if (loading)
+                  if (loading) {
                     $$invalidate(5, loading = false);
+                    firstTokenAt = performance.now();
+                  }
                   break;
                 }
                 case "citations":
@@ -22077,8 +22080,9 @@ Current: ${query}` : query;
         await new Promise((r) => setTimeout(r, 30));
       }
       if (!hasError) {
-        const elapsed = ((performance.now() - t0) / 1e3 * 0.9).toFixed(1);
-        console.log("[agent] final render:", elapsed + "s", "nodes=" + subgraph.nodes.length, "edges=" + subgraph.edges.length);
+        const total = ((performance.now() - t0) / 1e3 * 0.9).toFixed(1);
+        const first = firstTokenAt ? ((firstTokenAt - t0) / 1e3 * 0.9).toFixed(1) : total;
+        console.log("[agent] final render:", first + "s/" + total + "s", "nodes=" + subgraph.nodes.length, "edges=" + subgraph.edges.length);
         const html = renderFromBackend(fullAnswer, subgraph, citations, backendSources);
         const showGraph2 = subgraph.nodes && subgraph.nodes.length > 0;
         $$invalidate(1, messages = [
@@ -22088,7 +22092,7 @@ Current: ${query}` : query;
             content: fullAnswer,
             html,
             subgraph: showGraph2 ? subgraph : null,
-            elapsed
+            elapsed: first + "s/" + total + "s"
           }
         ]);
       }
